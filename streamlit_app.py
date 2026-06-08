@@ -256,15 +256,18 @@ with tab1:
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Source+Sans+3:wght@400;600&display=swap');
 
-        .game-block { margin-bottom: 2rem; page-break-inside: avoid; }
-
+        .game-block {
+            margin-bottom: 1rem;      /* was 2rem */
+            page-break-inside: avoid;
+        }
+                    
         .game-header {
             background: #2c2c2c;
             color: white;
             text-align: center;
-            padding: 10px 0;
+            padding: 6px 0;          /* was 10px */
             font-family: 'Oswald', sans-serif;
-            font-size: 1.6rem;
+            font-size: 1.2rem;        /* was 1.6rem */
             font-weight: 700;
             letter-spacing: 2px;
             margin-bottom: 0;
@@ -280,7 +283,7 @@ with tab1:
 
         .court-cell {
             border-right: 2px solid #2c2c2c;
-            padding: 12px 8px;
+            padding: 8px 6px;         /* was 12px 8px */
             text-align: center;
             background: #f5f5f5;
         }
@@ -288,28 +291,28 @@ with tab1:
 
         .court-title {
             font-family: 'Oswald', sans-serif;
-            font-size: 1.15rem;
+            font-size: 0.95rem;       /* was 1.15rem */
             font-weight: 600;
             color: #2c2c2c;
             background: #dcdcdc;
-            margin: -12px -8px 8px -8px;
-            padding: 6px 0;
+            margin: -12px -8px 6px -8px;  /* was 8px bottom */
+            padding: 4px 0;           /* was 6px */
             letter-spacing: 1px;
         }
 
         .team-name {
             font-family: 'Source Sans 3', sans-serif;
-            font-size: 1.05rem;
+            font-size: 0.9rem;        /* was 1.05rem */
             font-weight: 600;
             color: #1a1a1a;
-            line-height: 1.4;
+            line-height: 1.3;         /* was 1.4 */
         }
 
         .vs-label {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.85rem;
+            font-size: 0.75rem;       /* was 0.85rem */
             color: #888;
-            margin: 4px 0;
+            margin: 2px 0;            /* was 4px */
             letter-spacing: 1px;
         }
 
@@ -340,6 +343,95 @@ with tab1:
         }
         </style>
         """, unsafe_allow_html=True)
+
+        # ── PDF Export ───────────────────────────
+        from fpdf import FPDF
+        import io
+
+        def generate_pdf(rounds_to_export):
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=10)
+            pdf.add_page()
+            pdf.set_margins(10, 10, 10)
+
+            # Title
+            pdf.set_font("Helvetica", "B", 18)
+            pdf.set_fill_color(44, 44, 44)
+            pdf.set_text_color(255, 255, 255)
+            pdf.cell(0, 10, "PICKLEMADE SCHEDULE", align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(3)
+
+            for r in rounds_to_export:
+                # Game header
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_fill_color(80, 80, 80)
+                pdf.set_text_color(255, 255, 255)
+                pdf.cell(0, 7, f"  GAME {r.round_num}", fill=True, new_x="LMARGIN", new_y="NEXT")
+
+                # Court columns
+                num_courts = len(r.courts)
+                page_width = pdf.w - 20          # subtract margins
+                col_width  = page_width / num_courts
+                row_height = 6
+
+                # Court headers row
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_fill_color(220, 220, 220)
+                pdf.set_text_color(30, 30, 30)
+                for court in r.courts:
+                    pdf.cell(col_width, row_height, f"Court {court.court_num}",
+                            border=1, align="C", fill=True)
+                pdf.ln()
+
+                # Team 1 row
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_fill_color(245, 245, 245)
+                for court in r.courts:
+                    t1 = " & ".join(p.name for p in court.team1.players)
+                    pdf.cell(col_width, row_height, t1, border=1, align="C", fill=True)
+                pdf.ln()
+
+                # VS row
+                pdf.set_font("Helvetica", "I", 8)
+                pdf.set_fill_color(255, 255, 255)
+                pdf.set_text_color(120, 120, 120)
+                for court in r.courts:
+                    pdf.cell(col_width, row_height - 1, "vs", border=1, align="C", fill=True)
+                pdf.ln()
+
+                # Team 2 row
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_fill_color(245, 245, 245)
+                pdf.set_text_color(30, 30, 30)
+                for court in r.courts:
+                    t2 = " & ".join(p.name for p in court.team2.players)
+                    pdf.cell(col_width, row_height, t2, border=1, align="C", fill=True)
+                pdf.ln()
+
+                # Sit-out row
+                sit_names = [p.name for p in r.sit_outs]
+                if sit_names:
+                    pdf.set_font("Helvetica", "I", 8)
+                    pdf.set_fill_color(255, 243, 205)
+                    pdf.set_text_color(100, 80, 0)
+                    pdf.cell(0, row_height - 1, f"  Sitting out: {', '.join(sit_names)}",
+                            border=1, align="L", fill=True, new_x="LMARGIN", new_y="NEXT")
+
+                pdf.ln(3)
+
+            return bytes(pdf.output())
+
+
+        col_export1, col_export2 = st.columns([3, 1])
+        col_export1.markdown("### 📅 Game Schedule")
+        pdf_bytes = generate_pdf(selected_rounds)
+        col_export2.download_button(
+            label="⬇️ Download PDF",
+            data=pdf_bytes,
+            file_name="picklemade_schedule.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
 
         # ── Render each round ────────────────
         for r in selected_rounds:
