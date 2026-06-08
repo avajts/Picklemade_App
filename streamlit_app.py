@@ -60,6 +60,7 @@ def session_players() -> list[Player]:
 # ─────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Setup")
+    st.caption("👆 Use this panel to add players and generate your schedule.")
 
     num_courts = st.number_input("Number of courts", min_value=1, max_value=20, value=3)
     num_rounds = st.number_input("Number of rounds", min_value=1, max_value=50, value=8)
@@ -219,46 +220,147 @@ tab1, tab2, tab3 = st.tabs(["📅 Schedule", "🏆 Stats", "📊 Pair Matrix"])
 #  Tab 1 — Schedule
 # ═══════════════════════════════════════════
 with tab1:
-    rounds = st.session_state.schedule
-
-    round_nums  = [f"Round {r.round_num}" for r in rounds]
-    view_all    = st.checkbox("Show all rounds", value=True)
-
-    if view_all:
-        selected_rounds = rounds
+    if st.session_state.schedule is None:
+        st.info("Generate a schedule first.")
     else:
-        chosen = st.selectbox("Select round", round_nums)
-        idx    = round_nums.index(chosen)
-        selected_rounds = [rounds[idx]]
+        rounds = st.session_state.schedule
 
-    for r in selected_rounds:
-        sit_names = [p.name for p in r.sit_outs]
-        header    = f"**Round {r.round_num}**"
-        if sit_names:
-            header += f"  —  💺 Sit-out: {', '.join(sit_names)}"
+        # ── Print tip ────────────────────────
+        st.caption("💡 Tip: Use your browser's Print function (Ctrl+P / Cmd+P) to print this schedule.")
 
-        with st.expander(header, expanded=True):
+        round_nums = [f"Game {r.round_num}" for r in rounds]
+        view_all   = st.checkbox("Show all games", value=True)
+
+        if view_all:
+            selected_rounds = rounds
+        else:
+            chosen = st.selectbox("Select game", round_nums)
+            idx    = round_nums.index(chosen)
+            selected_rounds = [rounds[idx]]
+
+        # ── Print/display styles ─────────────
+        st.markdown("""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Source+Sans+3:wght@400;600&display=swap');
+
+        .game-block { margin-bottom: 2rem; page-break-inside: avoid; }
+
+        .game-header {
+            background: #2c2c2c;
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            margin-bottom: 0;
+        }
+
+        .courts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0;
+            border: 2px solid #2c2c2c;
+            border-top: none;
+        }
+
+        .court-cell {
+            border-right: 2px solid #2c2c2c;
+            padding: 12px 8px;
+            text-align: center;
+            background: #f5f5f5;
+        }
+        .court-cell:last-child { border-right: none; }
+
+        .court-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #2c2c2c;
+            background: #dcdcdc;
+            margin: -12px -8px 8px -8px;
+            padding: 6px 0;
+            letter-spacing: 1px;
+        }
+
+        .team-name {
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            line-height: 1.4;
+        }
+
+        .vs-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            color: #888;
+            margin: 4px 0;
+            letter-spacing: 1px;
+        }
+
+        .sitout-bar {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-top: none;
+            text-align: center;
+            padding: 4px;
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 0.85rem;
+            color: #856404;
+        }
+
+        .warn-tag {
+            font-size: 0.7rem;
+            color: #cc4400;
+            display: block;
+        }
+
+        @media print {
+            .stSidebar, .stToolbar, .stDecoration,
+            [data-testid="stHeader"], [data-testid="stToolbar"],
+            .stCheckbox, .stSelectbox, .element-container:has(.stCheckbox) { display: none !important; }
+            .game-block { page-break-inside: avoid; margin-bottom: 1.2rem; }
+            .game-header { font-size: 1.3rem; padding: 6px 0; }
+            .team-name { font-size: 0.95rem; }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # ── Render each round ────────────────
+        for r in selected_rounds:
+            sit_names = [p.name for p in r.sit_outs]
+
+            # Build court cells HTML
+            cells_html = ""
             for court in r.courts:
-                def gender_badge(player: Player) -> str:
-                    icon = "👩" if player.gender == "F" else "👨"
-                    return f"{icon} {player.name}"
-
                 t1 = court.team1
                 t2 = court.team2
-                t1_str    = " & ".join(gender_badge(p) for p in t1.players)
-                t2_str    = " & ".join(gender_badge(p) for p in t2.players)
-                warn_t1   = " ⚠️ same gender" if not t1.is_mixed else ""
-                warn_t2   = " ⚠️ same gender" if not t2.is_mixed else ""
+                t1_str  = " & ".join(p.name for p in t1.players)
+                t2_str  = " & ".join(p.name for p in t2.players)
+                warn_t1 = '<span class="warn-tag">⚠️ same gender</span>' if not t1.is_mixed else ""
+                warn_t2 = '<span class="warn-tag">⚠️ same gender</span>' if not t2.is_mixed else ""
 
-                c1, c2, c3 = st.columns([5, 1, 5])
-                c1.markdown(f"**{t1_str}**{warn_t1}")
-                c2.markdown(
-                    "<div style='text-align:center;font-size:1.2rem;padding-top:4px'>vs</div>",
-                    unsafe_allow_html=True,
-                )
-                c3.markdown(f"**{t2_str}**{warn_t2}")
-                st.caption(f"Court {court.court_num}")
-                st.divider()
+                cells_html += f"""
+                <div class="court-cell">
+                    <div class="court-title">Court {court.court_num}</div>
+                    <div class="team-name">{t1_str}{warn_t1}</div>
+                    <div class="vs-label">vs</div>
+                    <div class="team-name">{t2_str}{warn_t2}</div>
+                </div>"""
+
+            sitout_html = ""
+            if sit_names:
+                sitout_html = f'<div class="sitout-bar">💺 Sitting out: {", ".join(sit_names)}</div>'
+
+            st.markdown(f"""
+            <div class="game-block">
+                <div class="game-header">GAME {r.round_num}</div>
+                <div class="courts-grid">{cells_html}</div>
+                {sitout_html}
+            </div>
+            """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════
 #  Tab 2 — Stats
