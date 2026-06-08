@@ -89,7 +89,7 @@ with st.sidebar:
     avoid_excluded = [new_couple] if new_couple != "None" else []
     avoid_options  = ["None"] + [n for n in existing_names if n not in avoid_excluded]
     new_avoid = st.selectbox(
-        "Avoids partnering with",
+        "Avoids partnering with (optional)",
         avoid_options,
         help="This player will never be placed on the same team as the selected player.",
     )
