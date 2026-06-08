@@ -153,29 +153,33 @@ def _greedy_fill(
 # ─────────────────────────────────────────────
 
 def _fill_court(
-    locked_team:  list[Player],   # 0 or 2 players already assigned to team1
+    slot:         list[Player],   # 0, 2, or 4 players already assigned
     remaining:    list[Player],
     court_num:    int,
     round_num:    int,
     tracker:      ConstraintTracker,
 ) -> tuple[CourtAssignment | None, list[Player]]:
-    """
-    Fill one court by scoring all valid 4-player candidate groupings
-    from `remaining`, optionally with one team already locked in.
 
-    Returns (CourtAssignment, updated_remaining) or (None, remaining) if stuck.
-    """
-    if locked_team:
-        # One team is fixed — find the best opposing team from remaining
-        candidates = _score_with_locked_team(locked_team, remaining, court_num, round_num, tracker)
+    # Case 1 — both teams already locked (4 players from two couples)
+    if len(slot) == 4:
+        court = CourtAssignment(
+            court_num=court_num,
+            team1=Team(slot[0:2]),
+            team2=Team(slot[2:4]),
+        )
+        return court, remaining
+
+    # Case 2 — one team locked (2 players), find best opposing team
+    if len(slot) == 2:
+        candidates = _score_with_locked_team(slot, remaining, court_num, round_num, tracker)
+
+    # Case 3 — no players locked, fill both teams from remaining pool
     else:
-        # Both teams come from remaining pool
         candidates = _score_open_court(remaining, court_num, round_num, tracker)
 
     if not candidates:
         return None, remaining
 
-    # Pick best score; break ties randomly
     best_score = candidates[0][0]
     top = [c for c in candidates if c[0] == best_score]
     chosen_score, chosen_court, chosen_players = random.choice(top)
