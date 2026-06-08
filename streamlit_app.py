@@ -358,7 +358,7 @@ with tab1:
             pdf.set_font("Helvetica", "", 8)
             pdf.set_fill_color(44, 44, 44)
             pdf.set_text_color(180, 180, 180)
-            pdf.cell(0, 6, "https://picklemadeapp.streamlit.app/", align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 6, "Visit picklemadeapp.streamlit.app", align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
 
             # Title
             pdf.set_font("Helvetica", "B", 18)
