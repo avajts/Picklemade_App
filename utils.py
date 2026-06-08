@@ -288,8 +288,32 @@ def validate_config(config: ScheduleConfig) -> list[str]:
                 f"Couples must be M+F to form a valid mixed team."
             )
  
+    # ── Avoid partner validation ──────────────
+    for p in config.players:
+        if p.avoid_partner:
+            if p.avoid_partner not in player_names:
+                errors.append(
+                    f"Avoid error: '{p.name}' wants to avoid '{p.avoid_partner}' "
+                    f"but that name isn't in the player list."
+                )
+            if p.avoid_partner == p.name:
+                errors.append(
+                    f"Avoid error: '{p.name}' cannot avoid themselves."
+                )
+            # Check they're not also listed as a couple
+            for (na, nb) in config.couple_rounds.keys():
+                if set([p.name, p.avoid_partner]) == set([na, nb]):
+                    errors.append(
+                        f"Conflict: '{p.name}' and '{p.avoid_partner}' "
+                        f"are listed as both a couple and an avoid pair."
+                    )
+
     return errors
+
+
  
+
+
 
 if __name__ == "__main__":
     from models import Player, ScheduleConfig

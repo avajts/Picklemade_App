@@ -16,8 +16,9 @@ WEIGHT_GENDER_VIOLATION  = -1000   # per non-mixed team
 WEIGHT_PARTNER_REPEAT    =   -10   # per prior round as partners
 WEIGHT_OPPONENT_REPEAT   =    -5   # per prior round as opponents
 WEIGHT_COUPLE_BONUS      =   500   # per couple correctly paired on their assigned round
+WEIGHT_AVOID_VIOLATION = -2000 
  
- 
+
 #  ConstraintTracker
  
 class ConstraintTracker:
@@ -72,6 +73,10 @@ class ConstraintTracker:
         score += self._couple_bonus(t1, round_num)
         score += self._couple_bonus(t2, round_num)
  
+        # ── Avoid partner constraint ──────────
+        score += self._avoid_score(t1)
+        score += self._avoid_score(t2)
+
         return score
  
     def update(self, court: CourtAssignment) -> None:
@@ -167,6 +172,15 @@ class ConstraintTracker:
             return WEIGHT_COUPLE_BONUS
         return 0
  
+    def _avoid_score(self, team: Team) -> int:
+        p1, p2 = team.players
+        if (
+            (p1.avoid_partner and p1.avoid_partner == p2.name) or
+            (p2.avoid_partner and p2.avoid_partner == p1.name)
+        ):
+            return WEIGHT_AVOID_VIOLATION
+        return 0
+
     def _increment_partner(self, name_a: str, name_b: str) -> None:
         """Increment partner count symmetrically."""
         self.partner_count[name_a][name_b] += 1

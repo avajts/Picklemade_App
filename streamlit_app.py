@@ -48,6 +48,7 @@ def session_players() -> list[Player]:
             name=p["name"],
             gender=p["gender"],
             couple_partner=p["couple_partner"] or None,
+            avoid_partner=p.get("avoid_partner") or None,
         )
         for p in st.session_state.players
     ]
@@ -83,6 +84,15 @@ with st.sidebar:
             f"Rounds together",
             min_value=1, max_value=int(num_rounds), value=min(4, int(num_rounds))
         )
+    
+    # Filter out the selected couple from avoid options
+    avoid_excluded = [new_couple] if new_couple != "None" else []
+    avoid_options  = ["None"] + [n for n in existing_names if n not in avoid_excluded]
+    new_avoid = st.selectbox(
+        "Avoids partnering with",
+        avoid_options,
+        help="This player will never be placed on the same team as the selected player.",
+    )
 
     if st.button("➕ Add Player", type="primary"):
         name = new_name.strip()
@@ -97,6 +107,7 @@ with st.sidebar:
                 "gender":         new_gender,
                 "couple_partner": partner,
                 "couple_rounds":  new_couple_rounds if partner else 0,
+                "avoid_partner":  avoid if avoid != "None" else None, 
             })
             if partner:
                 for p in st.session_state.players:
@@ -115,7 +126,8 @@ with st.sidebar:
             c1, c2 = st.columns([5, 1])
             gender_icon = "👩" if p["gender"] == "F" else "👨"
             couple_tag  = f" 💑 {p['couple_partner']}" if p["couple_partner"] else ""
-            c1.markdown(f"{gender_icon} **{p['name']}**{couple_tag}")
+            avoid_tag   = f" 🚫 {p['avoid_partner']}" if p.get("avoid_partner") else ""
+            c1.markdown(f"{gender_icon} **{p['name']}**{couple_tag}{avoid_tag}")
             if c2.button("❌", key=f"del_{i}"):
                 removed = st.session_state.players.pop(i)
                 if removed["couple_partner"]:

@@ -22,6 +22,7 @@ class Player:
     name: str
     gender: str     # 'M' or 'F'
     couple_partner: str | None = None # name of their coupled partner, if any
+    avoid_partner: str | None = None 
 
     def __post_init__(self):
         self.gender = self.gender.upper()
