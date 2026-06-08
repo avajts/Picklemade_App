@@ -107,7 +107,7 @@ with st.sidebar:
                 "gender":         new_gender,
                 "couple_partner": partner,
                 "couple_rounds":  new_couple_rounds if partner else 0,
-                "avoid_partner":  avoid if avoid != "None" else None, 
+                "avoid_partner":  new_avoid if new_avoid != "None" else None, 
             })
             if partner:
                 for p in st.session_state.players:
