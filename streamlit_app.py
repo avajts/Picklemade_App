@@ -23,8 +23,6 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("🏓 Picklemade")
-st.caption("Mixed doubles scheduler — fair rotations, couple-friendly.")
 
 # ─────────────────────────────────────────────
 #  Session state initialization
@@ -60,8 +58,7 @@ def session_players() -> list[Player]:
 # ─────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Setup")
-    st.caption("👆 Use this panel to add players and generate your schedule.")
-
+    
     num_courts = st.number_input("Number of courts", min_value=1, max_value=20, value=3)
     num_rounds = st.number_input("Number of rounds", min_value=1, max_value=50, value=8)
 
@@ -197,14 +194,30 @@ with st.sidebar:
 #  Main area
 # ─────────────────────────────────────────────
 if st.session_state.schedule is None:
-    st.info("👈 Add players and hit **Generate Schedule** to get started.")
     st.markdown("""
-    **How it works:**
-    - Each court plays **mixed doubles** (1M + 1F per team) where possible
-    - Players rotate so they **don't repeat partners or opponents** too often
-    - Couples can be assigned extra rounds together
-    - Sit-outs rotate fairly if player count doesn't divide evenly into courts
-    """)
+    <div style="text-align:center; padding: 3rem 1rem;">
+        <div style="font-size: 3rem;">🏓</div>
+        <h2 style="font-family: 'Oswald', sans-serif; letter-spacing: 2px;">Welcome to Picklemade</h2>
+         <p style="font-size: 1.1rem; color: #555;">Your mixed doubles pickleball scheduler.</p>
+        <br>
+        <div style="
+            display: inline-block;
+            background: #2c2c2c;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            line-height: 1.8;
+        ">
+            Press the <strong>&gt;</strong><strong>&gt;</strong> arrow in the <strong>top left corner</strong> to open the sidebar.<br>
+            Then add your players and hit <strong>Generate Schedule</strong>
+        </div>
+        <br><br>
+        <p style="font-size: 0.9rem; color: #888;">
+            ✅ Mixed doubles pairing &nbsp;|&nbsp; 💑 Couple support &nbsp;|&nbsp; 💺 Fair sit-out rotation
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
 # ── Warnings ─────────────────────────────────
