@@ -132,18 +132,17 @@ def _greedy_fill(
     while len(court_slots) < config.num_courts:
         court_slots.append([])   # empty slot = needs both teams from remaining pool
 
-    for slot in court_slots:
+    for i, slot in enumerate(court_slots):
         if len(remaining) < (4 - len(slot) * 2):
-            return None   # not enough players left — retry
+            return None
 
         court, remaining = _fill_court(
-            slot, remaining, court_num, round_num, tracker
+            slot, remaining, i + 1, round_num, tracker
         )
         if court is None:
-            return None   # couldn't find a valid grouping — retry
+            return None
 
         courts.append(court)
-        court_num += 1
 
     return courts
 
@@ -153,27 +152,32 @@ def _greedy_fill(
 # ─────────────────────────────────────────────
 
 def _fill_court(
-    slot:         list[Player],   # 0, 2, or 4 players already assigned
+    slot:         list,            # [], [[p1,p2]], or [[p1,p2],[p3,p4]]
     remaining:    list[Player],
     court_num:    int,
     round_num:    int,
     tracker:      ConstraintTracker,
 ) -> tuple[CourtAssignment | None, list[Player]]:
 
-    # Case 1 — both teams already locked (4 players from two couples)
-    if len(slot) == 4:
+    # Case 1 — two couples already fill the whole court
+    if len(slot) == 2:
+        team1_players = slot[0]    # [Player, Player]
+        team2_players = slot[1]    # [Player, Player]
         court = CourtAssignment(
             court_num=court_num,
-            team1=Team(slot[0:2]),
-            team2=Team(slot[2:4]),
+            team1=Team(team1_players),
+            team2=Team(team2_players),
         )
         return court, remaining
 
-    # Case 2 — one team locked (2 players), find best opposing team
-    if len(slot) == 2:
-        candidates = _score_with_locked_team(slot, remaining, court_num, round_num, tracker)
+    # Case 2 — one couple fills team1, find best team2 from remaining
+    if len(slot) == 1:
+        locked_team = slot[0]      # [Player, Player]
+        candidates = _score_with_locked_team(
+            locked_team, remaining, court_num, round_num, tracker
+        )
 
-    # Case 3 — no players locked, fill both teams from remaining pool
+    # Case 3 — no couples, fill both teams from remaining pool
     else:
         candidates = _score_open_court(remaining, court_num, round_num, tracker)
 
@@ -186,7 +190,6 @@ def _fill_court(
 
     updated_remaining = [p for p in remaining if p not in chosen_players]
     return chosen_court, updated_remaining
-
 
 def _score_open_court(
     pool:      list[Player],
@@ -334,20 +337,22 @@ def _pair_up_locked(
     locked_pairs: list[list[Player]],
 ) -> list[list[Player]]:
     """
-    Convert locked couple pairs into partial court slots.
-    Each slot is a 2-player list (team1 is set; team2 still needs filling).
-    If two locked pairs exist, they can share a court (pair vs pair).
+    Convert locked couple pairs into court slots.
+    Each slot is either:
+        - 2 players  → team1 is set, team2 needs filling from remaining pool
+        - 4 players  → both teams set (two couples share a court)
     """
-    slots  = []
-    pairs  = locked_pairs[:]
+    slots = []
+    pairs = locked_pairs[:]
 
     while len(pairs) >= 2:
-        # Two locked teams → one full court (still scored for opponent freshness)
-        slots.append(pairs.pop(0) + pairs.pop(0))   # 4 players, split as [0:2] vs [2:4]
+        # Two locked couples → one full court, stored as two separate sublists
+        slot = [pairs.pop(0), pairs.pop(0)]   # [[p1,p2], [p3,p4]]
+        slots.append(slot)
 
     if pairs:
-        # One leftover locked pair → goes as team1, team2 filled from remaining
-        slots.append(pairs.pop(0))
+        # One leftover couple → team1 only, needs an opponent
+        slots.append([pairs.pop(0)])           # [[p1,p2]]
 
     return slots
 
