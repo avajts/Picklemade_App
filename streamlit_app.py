@@ -423,7 +423,7 @@ with tab1:
                     pdf.cell(0, row_height - 1, f"  Sitting out: {', '.join(sit_names)}",
                             border=1, align="L", fill=True, new_x="LMARGIN", new_y="NEXT")
 
-                pdf.ln(3)
+                pdf.ln(1)
 
             return bytes(pdf.output())
 
