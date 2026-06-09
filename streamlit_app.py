@@ -485,9 +485,9 @@ with tab1:
                 t2 = court.team2
                 t1_str  = " & ".join(p.name for p in t1.players)
                 t2_str  = " & ".join(p.name for p in t2.players)
-                warn_t1 = '<span class="warn-tag">⚠️ same gender</span>' if not t1.is_mixed else ""
-                warn_t2 = '<span class="warn-tag">⚠️ same gender</span>' if not t2.is_mixed else ""
-
+                warn_t1 = " ⚠️ same gender" if (not t1.is_mixed and st.session_state.get("game_mode", "mixed") == "mixed") else ""
+                warn_t2 = " ⚠️ same gender" if (not t2.is_mixed and st.session_state.get("game_mode", "mixed") == "mixed") else ""
+                
                 cells_html += f"""
                 <div class="court-cell">
                     <div class="court-title">Court {court.court_num}</div>
