@@ -60,6 +60,16 @@ def session_players() -> list[Player]:
 with st.sidebar:
     st.header("⚙️ Setup")
     
+    st.subheader("🎮 Game Mode")
+    game_mode = st.radio(
+        "Select game type",
+        options=["mixed", "womens", "mens"],
+        format_func=lambda x: {"mixed": "⚧ Mixed Doubles", "womens": "👩 Women's Only", "mens": "👨 Men's Only"}[x],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    st.divider()
+
     num_courts = st.number_input("Number of courts", min_value=1, max_value=20, value=3)
     num_rounds = st.number_input("Number of rounds", min_value=1, max_value=50, value=8)
 
@@ -67,10 +77,14 @@ with st.sidebar:
 
     # ── Add player form ──────────────────────
     st.subheader("👤 Add Player")
-    col_name, col_gender = st.columns([3, 1])
-    new_name   = col_name.text_input("Name", placeholder="e.g. Alice", label_visibility="collapsed")
-    new_gender = col_gender.selectbox("Gender", ["F", "M"], label_visibility="collapsed")
-
+    if game_mode == "mixed":
+        col_name, col_gender = st.columns([3, 1])
+        new_name   = col_name.text_input("Name", placeholder="e.g. Alice", label_visibility="collapsed")
+        new_gender = col_gender.selectbox("Gender", ["F", "M"], label_visibility="collapsed")
+    else:
+        new_name   = st.text_input("Name", placeholder="e.g. Alice", label_visibility="collapsed")
+        new_gender = "F" if game_mode == "womens" else "M"
+    
     existing_names = [p["name"] for p in st.session_state.players]
     couple_options = ["None"] + existing_names
     new_couple = st.selectbox(
@@ -139,8 +153,12 @@ with st.sidebar:
 
         male_count   = sum(1 for p in st.session_state.players if p["gender"] == "M")
         female_count = sum(1 for p in st.session_state.players if p["gender"] == "F")
-        st.caption(f"Total: {len(st.session_state.players)} players — 👨 {male_count}M / 👩 {female_count}F")
-
+        mode_label = {"mixed": "Mixed Doubles", "womens": "Women's Only", "mens": "Men's Only"}[game_mode]
+        if game_mode == "mixed":
+            st.caption(f"{mode_label} · {len(st.session_state.players)} players — 👨 {male_count}M / 👩 {female_count}F")
+        else:
+            st.caption(f"{mode_label} · {len(st.session_state.players)} players")
+    
     st.divider()
 
     # ── Generate + Reset buttons ─────────────
@@ -161,6 +179,7 @@ with st.sidebar:
             num_rounds=int(num_rounds),
             players=players,
             couple_rounds=couple_rounds,
+            game_mode=game_mode,
         )
 
         errors = validate_config(config)

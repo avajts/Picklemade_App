@@ -243,12 +243,26 @@ def validate_config(config: ScheduleConfig) -> list[str]:
  
     # ── Gender balance warning ────────────────
     m, f = config.num_males, config.num_females
-    if abs(m - f) > config.num_courts * 2:
-        errors.append(
-            f"Gender imbalance warning: {m}M / {f}F. "
-            f"Some courts will need same-gender teams. "
-            f"Ideal ratio is within {config.num_courts * 2} of each other."
-        )
+
+    if config.game_mode == "mixed":
+        if abs(m - f) > config.num_courts * 2:
+            errors.append(
+                f"Gender imbalance warning: {m}M / {f}F. "
+                f"Some courts will need same-gender teams. "
+                f"Ideal ratio is within {config.num_courts * 2} of each other."
+            )
+    elif config.game_mode == "womens":
+        if m > 0:
+            errors.append(
+                f"Women's game mode selected but {m} male player(s) are in the list. "
+                f"Please remove male players or switch to Mixed mode."
+            )
+    elif config.game_mode == "mens":
+        if f > 0:
+            errors.append(
+                f"Men's game mode selected but {f} female player(s) are in the list. "
+                f"Please remove female players or switch to Mixed mode."
+            )
  
     # ── Couple validation ─────────────────────
     seen_coupled: dict[str, str] = {}   # name -> their partner

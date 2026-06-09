@@ -197,35 +197,35 @@ def _score_open_court(
     round_num: int,
     tracker:   ConstraintTracker,
 ) -> list[tuple[int, CourtAssignment, list[Player]]]:
-    """
-    Generate and score all valid mixed-gender 4-player groupings from pool.
-    Falls back to same-gender if no mixed option exists.
-    Returns list of (score, CourtAssignment, players_used), sorted descending.
-    """
-    males   = [p for p in pool if p.gender == "M"]
-    females = [p for p in pool if p.gender == "F"]
 
     scored = []
+    mode = tracker.config.game_mode
 
-    # ── Try all mixed assignments first ──────
-    # Each court needs (M+F) vs (M+F) → need 2M and 2F
-    for m1, m2 in combinations(males, 2):
-        for f1, f2 in combinations(females, 2):
-            # Two possible mixed team splits: (m1+f1 vs m2+f2) or (m1+f2 vs m2+f1)
-            for team1_players, team2_players in [
-                ([m1, f1], [m2, f2]),
-                ([m1, f2], [m2, f1]),
-            ]:
-                court = CourtAssignment(
-                    court_num=court_num,
-                    team1=Team(team1_players),
-                    team2=Team(team2_players),
-                )
-                score = tracker.score_assignment(court, round_num)
-                scored.append((score, court, team1_players + team2_players))
+    if mode == "mixed":
+        # Try all mixed assignments first
+        males   = [p for p in pool if p.gender == "M"]
+        females = [p for p in pool if p.gender == "F"]
 
-    # ── Fallback: same-gender teams if no mixed option ───────────────────────
-    if not scored:
+        for m1, m2 in combinations(males, 2):
+            for f1, f2 in combinations(females, 2):
+                for team1_players, team2_players in [
+                    ([m1, f1], [m2, f2]),
+                    ([m1, f2], [m2, f1]),
+                ]:
+                    court = CourtAssignment(
+                        court_num=court_num,
+                        team1=Team(team1_players),
+                        team2=Team(team2_players),
+                    )
+                    score = tracker.score_assignment(court, round_num)
+                    scored.append((score, court, team1_players + team2_players))
+
+        # Fallback if no mixed option exists
+        if not scored:
+            scored = _score_fallback_court(pool, court_num, round_num, tracker)
+
+    else:
+        # Single gender — score all combinations directly
         scored = _score_fallback_court(pool, court_num, round_num, tracker)
 
     scored.sort(key=lambda x: x[0], reverse=True)
