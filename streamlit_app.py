@@ -37,6 +37,8 @@ if "tracker"       not in st.session_state:
     st.session_state.tracker = None
 if "sit_summary"   not in st.session_state:
     st.session_state.sit_summary = {}
+if "game_mode" not in st.session_state:
+    st.session_state.game_mode = "mixed"
 
 
 # ─────────────────────────────────────────────
@@ -68,6 +70,8 @@ with st.sidebar:
         horizontal=True,
         label_visibility="collapsed",
     )
+    st.session_state.game_mode = game_mode    # ← save to session state
+    
     st.divider()
 
     num_courts = st.number_input("Number of courts", min_value=1, max_value=20, value=3)
@@ -179,7 +183,7 @@ with st.sidebar:
             num_rounds=int(num_rounds),
             players=players,
             couple_rounds=couple_rounds,
-            game_mode=game_mode,
+            game_mode=st.session_state.get("game_mode", "mixed"),    # ← use session state
         )
 
         errors = validate_config(config)
