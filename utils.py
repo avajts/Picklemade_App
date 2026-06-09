@@ -293,15 +293,6 @@ def validate_config(config: ScheduleConfig) -> list[str]:
                 f"but there are only {config.num_rounds} rounds total."
             )
  
-        # Couple must be opposite gender (since teams are M+F)
-        player_a = next((p for p in config.players if p.name == name_a), None)
-        player_b = next((p for p in config.players if p.name == name_b), None)
-        if player_a and player_b and player_a.gender == player_b.gender:
-            errors.append(
-                f"Couple ({name_a} & {name_b}) are the same gender. "
-                f"Couples must be M+F to form a valid mixed team."
-            )
- 
     # ── Avoid partner validation ──────────────
     for p in config.players:
         if p.avoid_partner:
