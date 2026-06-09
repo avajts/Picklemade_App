@@ -112,6 +112,7 @@ class ScheduleConfig:
     players: list[Player]
     couple_rounds: dict[tuple[str, str], int] = field(default_factory=dict)
     # ^ key: (player_name_A, player_name_B), value: how many rounds they play together
+    game_mode: str = "mixed"
 
     @property
     def players_per_round(self) -> int:
