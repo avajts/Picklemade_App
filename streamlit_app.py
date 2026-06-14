@@ -202,7 +202,7 @@ with st.sidebar:
                 cs.assign_rounds()
                 tracker = ConstraintTracker(config, cs)
                 for r in rounds:
-                    tracker.update_round(r.courts)
+                    tracker.update_round(r.courts, r.round_num)
 
                 sit_summary = {}
                 for r in rounds:

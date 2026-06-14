@@ -17,6 +17,7 @@ WEIGHT_PARTNER_REPEAT    =   -10   # per prior round as partners
 WEIGHT_OPPONENT_REPEAT   =    -5   # per prior round as opponents
 WEIGHT_COUPLE_BONUS      =   500   # per couple correctly paired on their assigned round
 WEIGHT_AVOID_VIOLATION = -2000 
+WEIGHT_CONSECUTIVE_COURT = -500   # same 4 players on same court in back-to-back rounds
  
 
 #  ConstraintTracker
@@ -39,7 +40,9 @@ class ConstraintTracker:
         # Symmetric count matrices — access as self.partner_count[nameA][nameB]
         self.partner_count:  dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         self.opponent_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
- 
+        # Tracks the last round number any group of 4 played together on the same court
+        self.last_court_round: dict[frozenset, int] = {}
+
     # ── Public API ───────────────────────────
  
     def score_assignment(self, court: CourtAssignment, round_num: int) -> int:
@@ -84,9 +87,12 @@ class ConstraintTracker:
         score += self._avoid_score(t1)
         score += self._avoid_score(t2)
 
+        # ── Consecutive court penalty ─────────
+        score += self._consecutive_court_score(court, round_num)
+
         return score
  
-    def update(self, court: CourtAssignment) -> None:
+    def update(self, court: CourtAssignment, round_num: int = 0) -> None:
         """
         Record the pairings from a finalized CourtAssignment.
         Call this for every court after a round is confirmed.
@@ -102,11 +108,15 @@ class ConstraintTracker:
         for a in court.team1.players:
             for b in court.team2.players:
                 self._increment_opponent(a.name, b.name)
+
+        # Consecutive court tracking
+        key = frozenset(p.name for p in court.all_players)
+        self.last_court_round[key] = round_num        
  
-    def update_round(self, courts: list[CourtAssignment]) -> None:
+    def update_round(self, courts: list[CourtAssignment], round_num: int = 0) -> None:
         """Convenience method — update all courts in a round at once."""
         for court in courts:
-            self.update(court)
+            self.update(court, round_num)
  
     # ── Diagnostic helpers (useful for UI display) ───
  
@@ -197,6 +207,16 @@ class ConstraintTracker:
         """Increment opponent count symmetrically."""
         self.opponent_count[name_a][name_b] += 1
         self.opponent_count[name_b][name_a] += 1
+
+    def _consecutive_court_score(self, court: CourtAssignment, round_num: int) -> int:
+        """
+        Penalize if these exact 4 players shared a court in the immediately preceding round.
+        """
+        key = frozenset(p.name for p in court.all_players)
+        last_round = self.last_court_round.get(key, -1)
+        if last_round == round_num - 1:
+            return WEIGHT_CONSECUTIVE_COURT
+        return 0
  
 if __name__ == "__main__":
     from models import Player, Team, CourtAssignment, ScheduleConfig

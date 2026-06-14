@@ -63,7 +63,7 @@ def build_schedule(config: ScheduleConfig) -> tuple[list[Round], list[str]]:
 
         # Step 3 — record round and update history
         completed_round = Round(round_num=round_num, courts=courts, sit_outs=sit_outs)
-        tracker.update_round(courts)
+        tracker.update_round(courts, round_num)
         rounds.append(completed_round)
 
     return rounds, warnings
