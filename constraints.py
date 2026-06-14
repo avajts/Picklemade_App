@@ -93,31 +93,27 @@ class ConstraintTracker:
         return score
  
     def update(self, court: CourtAssignment, round_num: int = 0) -> None:
-        """
-        Record the pairings from a finalized CourtAssignment.
-        Call this for every court after a round is confirmed.
-        """
         p1, p2 = court.team1.players
         p3, p4 = court.team2.players
- 
+
         # Partner pairs
         self._increment_partner(p1.name, p2.name)
         self._increment_partner(p3.name, p4.name)
- 
-        # Opponent pairs (all cross-team combinations)
+
+        # Opponent pairs
         for a in court.team1.players:
             for b in court.team2.players:
                 self._increment_opponent(a.name, b.name)
 
         # Consecutive court tracking
         key = frozenset(p.name for p in court.all_players)
-        self.last_court_round[key] = round_num        
- 
+        self.last_court_round[key] = round_num
+
     def update_round(self, courts: list[CourtAssignment], round_num: int = 0) -> None:
         """Convenience method — update all courts in a round at once."""
         for court in courts:
             self.update(court, round_num)
- 
+
     # ── Diagnostic helpers (useful for UI display) ───
  
     def partner_summary(self) -> list[dict]:
