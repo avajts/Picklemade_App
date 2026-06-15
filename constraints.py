@@ -18,7 +18,7 @@ WEIGHT_OPPONENT_REPEAT   =    -5   # per prior round as opponents
 WEIGHT_COUPLE_BONUS      =   500   # per couple correctly paired on their assigned round
 WEIGHT_AVOID_VIOLATION = -2000 
 WEIGHT_CONSECUTIVE_COURT = -500   # same 4 players on same court in back-to-back rounds
- 
+WEIGHT_CONSECUTIVE_PAIR_COURT = -300   # same 2 players on same court 3+ rounds in a row 
 
 #  ConstraintTracker
  
@@ -42,6 +42,10 @@ class ConstraintTracker:
         self.opponent_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         # Tracks the last round number any group of 4 played together on the same court
         self.last_court_round: dict[frozenset, int] = {}
+        # Tracks the last round any PAIR of players shared a court (regardless of teams)
+        self.last_pair_court_round: dict[frozenset, int] = {}
+        # Tracks current consecutive court streak for any pair
+        self.pair_court_streak: dict[frozenset, int] = {}
 
     # ── Public API ───────────────────────────
  
@@ -90,6 +94,9 @@ class ConstraintTracker:
         # ── Consecutive court penalty ─────────
         score += self._consecutive_court_score(court, round_num)
 
+        # ── Consecutive pair court penalty ────
+        score += self._consecutive_pair_court_score(court, round_num)
+
         return score
  
     def update(self, court: CourtAssignment, round_num: int = 0) -> None:
@@ -108,6 +115,20 @@ class ConstraintTracker:
         # Consecutive court tracking
         key = frozenset(p.name for p in court.all_players)
         self.last_court_round[key] = round_num
+
+        # Consecutive court tracking — every pair on this court
+        all_players = court.all_players
+        for i, a in enumerate(all_players):
+            for b in all_players[i + 1:]:
+                key = frozenset({a.name, b.name})
+                last = self.last_pair_court_round.get(key, -99)
+                if last == round_num - 1:
+                    # They were together last round too — increment streak
+                    self.pair_court_streak[key] = self.pair_court_streak.get(key, 1) + 1
+                else:
+                    # Streak broken — reset to 1
+                    self.pair_court_streak[key] = 1
+                self.last_pair_court_round[key] = round_num
 
     def update_round(self, courts: list[CourtAssignment], round_num: int = 0) -> None:
         """Convenience method — update all courts in a round at once."""
@@ -213,6 +234,23 @@ class ConstraintTracker:
         if last_round == round_num - 1:
             return WEIGHT_CONSECUTIVE_COURT
         return 0
+    
+    def _consecutive_pair_court_score(self, court: CourtAssignment, round_num: int) -> int:
+        """
+        Penalize if any pair of players on this court have shared a court
+        for 2 or more consecutive rounds already — preventing 3+ in a row.
+        """
+        score = 0
+        all_players = court.all_players
+        for i, a in enumerate(all_players):
+            for b in all_players[i + 1:]:
+                key = frozenset({a.name, b.name})
+                last = self.last_pair_court_round.get(key, -99)
+                streak = self.pair_court_streak.get(key, 0)
+                # If they were together last round AND streak is already 2+, penalize
+                if last == round_num - 1 and streak >= 2:
+                    score += WEIGHT_CONSECUTIVE_PAIR_COURT
+        return score
  
 if __name__ == "__main__":
     from models import Player, Team, CourtAssignment, ScheduleConfig
