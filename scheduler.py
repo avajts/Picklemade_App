@@ -213,15 +213,15 @@ def _score_open_court(
                     scored.append((score, court, team1_players + team2_players))
 
         if not scored:
-            scored = _score_fallback_court(pool, court_num, round_num, tracker)
+            scored = _score_fallback_court(pool, court_num, round_num, tracker, court_mode)
 
     elif court_mode == "womens":
         women_only = [p for p in pool if p.gender == "F"]
-        scored = _score_fallback_court(women_only, court_num, round_num, tracker)
+        scored = _score_fallback_court(women_only, court_num, round_num, tracker, court_mode)
 
     elif court_mode == "mens":
         men_only = [p for p in pool if p.gender == "M"]
-        scored = _score_fallback_court(men_only, court_num, round_num, tracker)
+        scored = _score_fallback_court(men_only, court_num, round_num, tracker, court_mode)
 
     scored.sort(key=lambda x: x[0], reverse=True)
     return scored
@@ -244,25 +244,25 @@ def _score_with_locked_team(
         females = [p for p in pool if p.gender == "F"]
         for m in males:
             for f in females:
-                court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([m, f]), mode=court_mode,)
+                court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([m, f]))
                 score = tracker.score_assignment(court, round_num)
                 scored.append((score, court, locked + [m, f]))
     elif court_mode == "womens":
         candidates_pool = [p for p in pool if p.gender == "F"]
         for p1, p2 in combinations(candidates_pool, 2):
-            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]), mode=court_mode, )
+            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]))
             score = tracker.score_assignment(court, round_num)
             scored.append((score, court, locked + [p1, p2]))
     elif court_mode == "mens":
         candidates_pool = [p for p in pool if p.gender == "M"]
         for p1, p2 in combinations(candidates_pool, 2):
-            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]), mode=court_mode, )
+            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]))
             score = tracker.score_assignment(court, round_num)
             scored.append((score, court, locked + [p1, p2]))
 
     if not scored:
         for p1, p2 in combinations(pool, 2):
-            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]), mode=court_mode, )
+            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]), mode=court_mode)
             score = tracker.score_assignment(court, round_num)
             scored.append((score, court, locked + [p1, p2]))
 
@@ -271,10 +271,11 @@ def _score_with_locked_team(
 
 
 def _score_fallback_court(
-    pool:      list[Player],
-    court_num: int,
-    round_num: int,
-    tracker:   ConstraintTracker,
+    pool:        list[Player],
+    court_num:   int,
+    round_num:   int,
+    tracker:     ConstraintTracker,
+    court_mode:  str = "mixed",      # ← add this parameter
 ) -> list[tuple[int, CourtAssignment, list[Player]]]:
     """
     Last resort: score all 4-player combinations regardless of gender.
@@ -287,7 +288,7 @@ def _score_fallback_court(
                 court_num=court_num,
                 team1=Team(list(t1)),
                 team2=Team(list(t2)),
-                mode=court_mode, 
+                mode=court_mode,
             )
             score = tracker.score_assignment(court, round_num)
             scored.append((score, court, list(group)))
