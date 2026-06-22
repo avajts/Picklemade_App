@@ -225,32 +225,6 @@ with st.sidebar:
             st.success(f"Added {name}!")
             st.rerun()
 
-    # ── Auto-focus the name field after submission ──────────
-    st.markdown("""
-    <script>
-        function focusNameField() {
-            try {
-                const inputs = window.parent.document.querySelectorAll(
-                    'section[data-testid="stSidebar"] input[type="text"]'
-                );
-                if (inputs.length > 0) {
-                    inputs[0].focus();
-                    return true;
-                }
-            } catch (e) {}
-            return false;
-        }
-
-        let attempts = 0;
-        const interval = setInterval(function() {
-            attempts++;
-            if (focusNameField() || attempts > 20) {
-                clearInterval(interval);
-            }
-        }, 100);
-    </script>
-    """, unsafe_allow_html=True)
-
     # ── Player list ──────────────────────────
     if st.session_state.players:
         st.subheader("📋 Player List")
