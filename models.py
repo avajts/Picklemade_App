@@ -123,6 +123,10 @@ class ScheduleConfig:
     game_mode: str = "mixed"
     court_overrides: dict[tuple[int, int], str] = field(default_factory=dict)
 
+    def get_court_mode(self, round_num: int, court_num: int) -> str:
+        """Returns the effective gender mode for a specific round+court, falling back to global mode."""
+        return self.court_overrides.get((round_num, court_num), self.game_mode)
+
     @property
     def players_per_round(self) -> int:
         return self.num_courts * 4
