@@ -149,5 +149,5 @@ class ScheduleConfig:
             f"{self.num_courts} courts, "
             f"{self.num_rounds} rounds, "
             f"{len(self.players)} players "
-            f"[{self.num_males}M / {self.num_femails}F]"
+            f"[{self.num_males}M / {self.num_females}F])"
         )

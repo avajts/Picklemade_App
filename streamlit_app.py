@@ -745,10 +745,6 @@ with tab4:
 
                     # Recompute everything
                     config = st.session_state.get("last_config")
-                    st.write("DEBUG — config is:", config)   # ← temporary debug line
-                    if config is None:
-                        st.error("Session expired — please regenerate the schedule before editing.")
-                        st.stop()
                     tracker, sit_summary = recompute_all_stats(rounds, players, config)
                     st.session_state.schedule    = rounds
                     st.session_state.tracker     = tracker
