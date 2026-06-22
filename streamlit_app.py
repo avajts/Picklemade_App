@@ -300,15 +300,6 @@ with st.sidebar:
     if st.button("🎲 Generate Schedule", type="primary", use_container_width=True):
         players = session_players()
 
-        couple_rounds = {}
-        seen = set()
-        for p in st.session_state.players:
-            if p["couple_partner"] and p["couple_rounds"] > 0:
-                key = tuple(sorted([p["name"], p["couple_partner"]]))
-                if key not in seen:
-                    couple_rounds[key] = p["couple_rounds"]
-                    seen.add(key)
-
         config = ScheduleConfig(
             num_courts=int(num_courts),
             num_rounds=int(num_rounds),
