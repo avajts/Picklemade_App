@@ -245,9 +245,9 @@ with st.sidebar:
             players=players,
             couple_rounds=couple_rounds,
             game_mode=st.session_state.get("game_mode", "mixed"),
-            court_overrides=st.session_state.get("court_overrides", {}),    # ← add
-            st.session_state.last_config = config,
+            court_overrides=st.session_state.get("court_overrides", {}),
         )
+        st.session_state.last_config = config,
 
         errors = validate_config(config)
         if errors:
