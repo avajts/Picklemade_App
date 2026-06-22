@@ -185,8 +185,9 @@ with st.sidebar:
     )
     pp_rounds = pp_col2.number_input(
         "Rounds", min_value=1, max_value=int(num_rounds), value=1,
-        key="pp_rounds_input", label_visibility="collapsed"
+        key="pp_rounds_input"
     )
+    pp_col3.markdown("<div style='height: 28px'></div>", unsafe_allow_html=True)
     if pp_col3.button("➕", key="pp_add_btn", help="Add this preferred partner"):
         if pp_name != "None" and pp_name not in [n for n, _ in st.session_state.pending_partners]:
             st.session_state.pending_partners.append((pp_name, pp_rounds))
