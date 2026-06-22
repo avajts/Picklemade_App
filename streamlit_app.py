@@ -179,14 +179,11 @@ with st.sidebar:
 
     existing_names = [p["name"] for p in st.session_state.players]
 
-    def _try_submit_on_enter():
-        st.session_state.trigger_add_player = True
-
     if game_mode == "mixed":
         col_name, col_gender = st.columns([3, 1])
         form_name = col_name.text_input(
             "Name", placeholder="e.g. Alice", label_visibility="collapsed",
-            key="new_player_name", on_change=_try_submit_on_enter,
+            key="new_player_name",
         )
         form_gender = col_gender.selectbox(
             "Gender", ["F", "M"],
@@ -196,7 +193,7 @@ with st.sidebar:
     else:
         form_name = st.text_input(
             "Name", placeholder="e.g. Alice", label_visibility="collapsed",
-            key="new_player_name", on_change=_try_submit_on_enter,
+            key="new_player_name",
         )
         form_gender = "F" if game_mode == "womens" else "M"
 
@@ -244,11 +241,7 @@ with st.sidebar:
     # Submit button
     add_clicked = st.button("➕ Add Player", type="primary", use_container_width=True)
 
-    triggered_by_enter = st.session_state.get("trigger_add_player", False)
-    if triggered_by_enter:
-        st.session_state.trigger_add_player = False
-
-    if add_clicked or triggered_by_enter:
+    if add_clicked:
         name = form_name.strip()
         if not name:
             st.warning("Please enter a player name.")
