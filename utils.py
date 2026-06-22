@@ -129,87 +129,70 @@ class SitOutRotation:
  
 class CoupleScheduler:
     """
-    Decides WHICH round numbers a couple plays together as partners.
- 
-    Usage:
-        cs = CoupleScheduler(config)
-        cs.assign_rounds()
-        rounds = cs.get_couple_rounds("Alice", "Bob")
-        # → e.g. {1, 3, 5, 6, 8}
+    Decides WHICH rounds each preferred-partner pair plays together,
+    ensuring no player is double-booked across multiple partners in the same round.
     """
- 
+
     def __init__(self, config: ScheduleConfig):
         self.config = config
-        # Internal store: frozenset({nameA, nameB}) -> set of round numbers
         self._assignments: dict[frozenset, set[int]] = {}
- 
-    # ── Public API ───────────────────────────
- 
+
     def assign_rounds(self) -> None:
         """
-        Randomly assign which rounds each couple plays together.
-        Call this once before the scheduler starts.
- 
-        Respects the desired round count from config.couple_rounds,
-        capped at num_rounds to prevent impossible requests.
+        For every player with multiple preferred partners, assign each
+        partnership a set of non-overlapping round numbers.
         """
         self._assignments.clear()
- 
-        all_rounds = list(range(1, self.config.num_rounds + 1))
- 
-        for (name_a, name_b), desired in self.config.couple_rounds.items():
+        all_pairs = self.config.get_all_preferred_pairs()   # {(a,b): desired_rounds}
+
+        # Track which rounds are already claimed, per player
+        claimed_rounds: dict[str, set[int]] = defaultdict(set)
+
+        # Process pairs in a stable but randomized order
+        pair_items = list(all_pairs.items())
+        random.shuffle(pair_items)
+
+        for (name_a, name_b), desired in pair_items:
+            available_for_both = [
+                r for r in range(1, self.config.num_rounds + 1)
+                if r not in claimed_rounds[name_a] and r not in claimed_rounds[name_b]
+            ]
+            actual = min(desired, len(available_for_both))
+            chosen = set(random.sample(available_for_both, actual)) if actual > 0 else set()
+
             key = frozenset({name_a, name_b})
- 
-            # Cap at total available rounds
-            actual = min(desired, self.config.num_rounds)
- 
-            if actual <= 0:
-                self._assignments[key] = set()
-                continue
- 
-            chosen_rounds = set(random.sample(all_rounds, actual))
-            self._assignments[key] = chosen_rounds
- 
+            self._assignments[key] = chosen
+
+            for r in chosen:
+                claimed_rounds[name_a].add(r)
+                claimed_rounds[name_b].add(r)
+
     def get_couple_rounds(self, name_a: str, name_b: str) -> set[int]:
-        """
-        Return the set of round numbers where (name_a, name_b)
-        are pre-assigned as partners.
-        Returns empty set if they are not a registered couple.
-        """
         key = frozenset({name_a, name_b})
         return self._assignments.get(key, set())
- 
+
     def is_couple_round(self, name_a: str, name_b: str, round_num: int) -> bool:
-        """True if this round is a pre-assigned couple round for (name_a, name_b)."""
         return round_num in self.get_couple_rounds(name_a, name_b)
- 
+
     def get_all_assignments(self) -> dict[tuple[str, str], set[int]]:
-        """
-        Return a readable copy of all assignments.
-        Keys are (name_a, name_b) tuples (sorted alphabetically).
-        """
         result = {}
         for key, rounds in self._assignments.items():
             names = tuple(sorted(key))
             result[names] = set(rounds)
         return result
- 
+
     def summary_table(self) -> list[dict]:
-        """
-        Returns a list of dicts suitable for a Streamlit st.dataframe() call.
-        e.g. [{"Couple": "Alice & Bob", "Desired Rounds": 5, "Assigned Rounds": "1,3,5,6,8"}]
-        """
         rows = []
-        for (name_a, name_b), desired in self.config.couple_rounds.items():
+        all_pairs = self.config.get_all_preferred_pairs()
+        for (name_a, name_b), desired in all_pairs.items():
             key = frozenset({name_a, name_b})
             assigned = self._assignments.get(key, set())
             rows.append({
-                "Couple": f"{name_a} & {name_b}",
+                "Pair": f"{name_a} & {name_b}",
                 "Desired Rounds Together": desired,
                 "Assigned Round #s": ", ".join(str(r) for r in sorted(assigned)),
             })
         return rows
- 
  
 # ─────────────────────────────────────────────
 #  Validation helpers (called before scheduling)
@@ -264,34 +247,30 @@ def validate_config(config: ScheduleConfig) -> list[str]:
                 f"Please remove female players or switch to Mixed mode."
             )
  
-    # ── Couple validation ─────────────────────
-    seen_coupled: dict[str, str] = {}   # name -> their partner
- 
-    for (name_a, name_b), desired_rounds in config.couple_rounds.items():
-        # Both names must exist
-        if name_a not in player_names:
-            errors.append(f"Couple error: '{name_a}' is not in the player list.")
-        if name_b not in player_names:
-            errors.append(f"Couple error: '{name_b}' is not in the player list.")
-        if name_a == name_b:
-            errors.append(f"Couple error: a player cannot be coupled with themselves ('{name_a}').")
- 
-        # A player can only be in one couple
-        for name in (name_a, name_b):
-            if name in seen_coupled:
-                errors.append(
-                    f"Couple error: '{name}' appears in more than one couple. "
-                    f"Each player can only have one partner."
-                )
-            else:
-                seen_coupled[name] = name_b if name == name_a else name_a
- 
-        # Desired rounds can't exceed total rounds
-        if desired_rounds > config.num_rounds:
+    # ── Preferred partner validation ──────────
+    for p in config.players:
+        total_requested = sum(rounds for _, rounds in p.preferred_partners)
+
+        if total_requested > config.num_rounds:
             errors.append(
-                f"Couple ({name_a} & {name_b}) want {desired_rounds} rounds together, "
-                f"but there are only {config.num_rounds} rounds total."
+                f"'{p.name}' requested {total_requested} total rounds across all preferred "
+                f"partners, but there are only {config.num_rounds} rounds. Reduce one or more requests."
             )
+
+        seen_partners = set()
+        for partner_name, rounds in p.preferred_partners:
+            if partner_name == p.name:
+                errors.append(f"'{p.name}' cannot be a preferred partner with themselves.")
+            if partner_name not in player_names:
+                errors.append(f"'{p.name}' has a preferred partner '{partner_name}' who isn't in the player list.")
+            if partner_name in seen_partners:
+                errors.append(f"'{p.name}' lists '{partner_name}' as a preferred partner more than once.")
+            seen_partners.add(partner_name)
+            if rounds > config.num_rounds:
+                errors.append(
+                    f"'{p.name}' wants {rounds} rounds with '{partner_name}', "
+                    f"but there are only {config.num_rounds} rounds total."
+                )
  
     # ── Avoid partner validation ──────────────
     for p in config.players:

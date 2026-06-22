@@ -326,14 +326,15 @@ def _score_fallback_court(
 #  Couple pre-assignment helpers
 # ─────────────────────────────────────────────
 
-def _extract_couple_pairs(
+ddef _extract_couple_pairs(
     available:        list[Player],
     round_num:        int,
     couple_scheduler: CoupleScheduler,
 ) -> tuple[list[list[Player]], list[Player]]:
     """
-    Find all couples whose pre-assigned round matches round_num.
-    Remove them from available and return them as locked pairs.
+    Find all preferred-partner pairs whose pre-assigned round matches round_num.
+    Each player can have multiple preferred partners, but only ONE will be
+    active for any given round (rounds are pre-assigned to be non-overlapping).
 
     Returns:
         locked_pairs : list of [Player, Player] pairs
@@ -342,18 +343,21 @@ def _extract_couple_pairs(
     locked_pairs: list[list[Player]] = []
     locked_names: set[str]           = set()
     avail_names                      = {p.name for p in available}
+    avail_lookup                     = {p.name: p for p in available}
 
     for p in available:
-        if p.couple_partner and p.name not in locked_names:
-            partner_name = p.couple_partner
+        if p.name in locked_names:
+            continue
+        for partner_name, _ in p.preferred_partners:
             if (
                 partner_name in avail_names
                 and partner_name not in locked_names
                 and couple_scheduler.is_couple_round(p.name, partner_name, round_num)
             ):
-                partner = next(q for q in available if q.name == partner_name)
+                partner = avail_lookup[partner_name]
                 locked_pairs.append([p, partner])
                 locked_names.update([p.name, partner_name])
+                break   # this player is locked for this round — stop checking their other partners
 
     remaining = [p for p in available if p.name not in locked_names]
     return locked_pairs, remaining

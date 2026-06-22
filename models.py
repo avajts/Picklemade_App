@@ -20,11 +20,11 @@ from dataclasses import dataclass, field
 @dataclass
 class Player:
     name: str
-    gender: str     # 'M' or 'F'
-    couple_partner: str | None = None # name of their coupled partner, if any
-    avoid_partner: str | None = None 
-    game_mode: str = "mixed" 
-    duper_rating: float | None = None   
+    gender: str
+    preferred_partners: list[tuple[str, int]] = field(default_factory=list)
+    # ^ list of (partner_name, desired_rounds_together)
+    avoid_partner: str | None = None
+    duper_rating: float | None = None 
 
     def __post_init__(self):
         self.gender = self.gender.upper()
@@ -40,11 +40,11 @@ class Player:
     def __eq__(self, other):
         return isinstance(other, Player) and self.name == other.name
     
-    def __repr__(self):
-        couple = f", partner={self.couple_partner}" if self.couple_partner else ""
-        avoid  = f", avoids={self.avoid_partner}" if self.avoid_partner else ""
-        rating = f", rating={self.duper_rating}" if self.duper_rating is not None else ""
-        return f"Player({self.name}, {self.gender}{couple}{avoid}{rating})"
+     def __repr__(self):
+        partners = f", partners={self.preferred_partners}" if self.preferred_partners else ""
+        avoid    = f", avoids={self.avoid_partner}" if self.avoid_partner else ""
+        rating   = f", rating={self.duper_rating}" if self.duper_rating is not None else ""
+        return f"Player({self.name}, {self.gender}{partners}{avoid}{rating})"
     
 # Team
 
@@ -118,14 +118,23 @@ class ScheduleConfig:
     num_courts: int
     num_rounds: int
     players: list[Player]
-    couple_rounds: dict[tuple[str, str], int] = field(default_factory=dict)
-    # ^ key: (player_name_A, player_name_B), value: how many rounds they play together
     game_mode: str = "mixed"
     court_overrides: dict[tuple[int, int], str] = field(default_factory=dict)
 
     def get_court_mode(self, round_num: int, court_num: int) -> str:
-        """Returns the effective gender mode for a specific round+court, falling back to global mode."""
         return self.court_overrides.get((round_num, court_num), self.game_mode)
+
+    def get_all_preferred_pairs(self) -> dict[tuple[str, str], int]:
+        """
+        Flattens every player's preferred_partners into a single
+        {(name_a, name_b): desired_rounds} dict, deduplicating symmetric entries.
+        """
+        pairs = {}
+        for p in self.players:
+            for partner_name, rounds in p.preferred_partners:
+                key = tuple(sorted([p.name, partner_name]))
+                pairs[key] = rounds   # both directions write the same value, so this is safe
+        return pairs
 
     @property
     def players_per_round(self) -> int:

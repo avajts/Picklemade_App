@@ -68,7 +68,7 @@ def session_players() -> list[Player]:
         Player(
             name=p["name"],
             gender=p["gender"],
-            couple_partner=p["couple_partner"] or None,
+            preferred_partners=p.get("preferred_partners", []),
             avoid_partner=p.get("avoid_partner") or None,
             duper_rating=p.get("duper_rating"),
         )
@@ -158,6 +158,27 @@ with st.sidebar:
     if "persisted_gender" not in st.session_state:
         st.session_state.persisted_gender = "F"
 
+    # ── Preferred partners builder (outside form — needs dynamic rows) ──
+    if "pending_partners" not in st.session_state:
+        st.session_state.pending_partners = []   # list of (name, rounds) for the NEXT player being added
+
+    st.markdown("**Preferred partners** (optional)")
+    pp_col1, pp_col2, pp_col3 = st.columns([2, 1, 1])
+    pp_name   = pp_col1.selectbox("Partner", ["None"] + existing_names, key="pp_name_select", label_visibility="collapsed")
+    pp_rounds = pp_col2.number_input("Rounds", min_value=1, max_value=int(num_rounds), value=1, key="pp_rounds_input", label_visibility="collapsed")
+    if pp_col3.button("➕", key="pp_add_btn", help="Add this preferred partner"):
+        if pp_name != "None" and pp_name not in [n for n, _ in st.session_state.pending_partners]:
+            st.session_state.pending_partners.append((pp_name, pp_rounds))
+            st.rerun()
+
+    if st.session_state.pending_partners:
+        for i, (pname, prounds) in enumerate(st.session_state.pending_partners):
+            tag_col1, tag_col2 = st.columns([5, 1])
+            tag_col1.caption(f"💑 {pname} — {prounds} rounds")
+            if tag_col2.button("✕", key=f"pp_remove_{i}"):
+                st.session_state.pending_partners.pop(i)
+                st.rerun()
+
     with st.form(key="add_player_form", clear_on_submit=True):
         if game_mode == "mixed":
             col_name, col_gender = st.columns([3, 1])
@@ -171,18 +192,7 @@ with st.sidebar:
             form_name   = st.text_input("Name", placeholder="e.g. Alice", label_visibility="collapsed")
             form_gender = "F" if game_mode == "womens" else "M"
 
-        existing_names = [p["name"] for p in st.session_state.players]
-        couple_options = ["None"] + existing_names
-        form_couple = st.selectbox("Coupled with (optional)", couple_options)
-
-        form_couple_rounds = 0
-        if form_couple != "None":
-            form_couple_rounds = st.number_input(
-                "Rounds together",
-                min_value=1, max_value=int(num_rounds), value=min(4, int(num_rounds))
-            )
-
-        avoid_excluded = [form_couple] if form_couple != "None" else []
+        avoid_excluded = [n for n, _ in st.session_state.pending_partners]
         avoid_options  = ["None"] + [n for n in existing_names if n not in avoid_excluded]
         form_avoid = st.selectbox(
             "Avoids partnering with",
@@ -197,7 +207,7 @@ with st.sidebar:
         )
 
         submitted = st.form_submit_button("➕ Add Player", type="primary", use_container_width=True)
-
+    
     if submitted:
         name = form_name.strip()
         if not name:
@@ -205,23 +215,26 @@ with st.sidebar:
         elif name in existing_names:
             st.warning(f"'{name}' is already in the list.")
         else:
-            partner = form_couple if form_couple != "None" else None
-            st.session_state.players.append({
-                "name":           name,
-                "gender":         form_gender,
-                "couple_partner": partner,
-                "couple_rounds":  form_couple_rounds if partner else 0,
-                "avoid_partner":  form_avoid if form_avoid != "None" else None,
-                "duper_rating":   form_rating if form_rating > 0.0 else None,
-            })
-            if partner:
-                for p in st.session_state.players:
-                    if p["name"] == partner:
-                        p["couple_partner"] = name
-                        p["couple_rounds"]  = form_couple_rounds
+            partners_list = list(st.session_state.pending_partners)   # [(name, rounds), ...]
 
-            # Persist gender for the next entry, reset everything else
-            st.session_state.persisted_gender = form_gender
+            st.session_state.players.append({
+                "name":               name,
+                "gender":             form_gender,
+                "preferred_partners": partners_list,
+                "avoid_partner":      form_avoid if form_avoid != "None" else None,
+                "duper_rating":       form_rating if form_rating > 0.0 else None,
+            })
+
+            # Sync the relationship on each partner's existing record too
+            for partner_name, rounds in partners_list:
+                for p in st.session_state.players:
+                    if p["name"] == partner_name:
+                        existing = dict(p.get("preferred_partners", []))
+                        existing[name] = rounds
+                        p["preferred_partners"] = list(existing.items())
+
+            st.session_state.persisted_gender   = form_gender
+            st.session_state.pending_partners   = []   # reset for next player
             st.success(f"Added {name}!")
             st.rerun()
 
@@ -231,7 +244,11 @@ with st.sidebar:
         for i, p in enumerate(st.session_state.players):
             c1, c2 = st.columns([5, 1])
             gender_icon = "👩" if p["gender"] == "F" else "👨"
-            couple_tag  = f" 💑 {p['couple_partner']}" if p["couple_partner"] else ""
+            partners = p.get("preferred_partners", [])
+            couple_tag = ""
+            if partners:
+                tags = ", ".join(f"{n} ({r}r)" for n, r in partners)
+                couple_tag = f" 💑 {tags}"
             avoid_tag   = f" 🚫 {p['avoid_partner']}" if p.get("avoid_partner") else ""
             rating_tag  = f" 🎯 {p['duper_rating']:.2f}" if p.get("duper_rating") else ""
             c1.markdown(f"{gender_icon} **{p['name']}**{couple_tag}{avoid_tag}{rating_tag}")
@@ -271,7 +288,6 @@ with st.sidebar:
             num_courts=int(num_courts),
             num_rounds=int(num_rounds),
             players=players,
-            couple_rounds=couple_rounds,
             game_mode=st.session_state.get("game_mode", "mixed"),
             court_overrides=st.session_state.get("court_overrides", {}),
         )
