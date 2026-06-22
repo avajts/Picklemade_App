@@ -179,10 +179,9 @@ with st.sidebar:
         form_gender = "F" if game_mode == "womens" else "M"
 
     # Preferred Partners — directly under Name, before Avoid
-    st.markdown("Preferred partners (optional)")
     pp_col1, pp_col2, pp_col3 = st.columns([2, 1, 1])
     pp_name = pp_col1.selectbox(
-        "Partner", ["None"] + existing_names, key="pp_name_select", label_visibility="collapsed"
+        "Preferred partners (optional)", ["None"] + existing_names, key="pp_name_select"
     )
     pp_rounds = pp_col2.number_input(
         "Rounds", min_value=1, max_value=int(num_rounds), value=1,
