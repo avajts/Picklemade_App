@@ -25,6 +25,12 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    button[kind="secondary"]:has(div:contains("➕")) {
+        background-color: #2c2c2c !important;
+        color: white !important;
+        border: none !important;
+        font-weight: 700 !important;
+    }
     section[data-testid="stSidebar"] .stTextInput,
     section[data-testid="stSidebar"] .stSelectbox,
     section[data-testid="stSidebar"] .stNumberInput {
@@ -198,7 +204,7 @@ with st.sidebar:
         key="pp_rounds_input"
     )
     pp_col3.markdown("<div style='height: 28px'></div>", unsafe_allow_html=True)
-    if pp_col3.button("➕", key="pp_add_btn", help="Add this preferred partner"):
+    if pp_col3.button("➕", key="pp_add_btn", help="Add this preferred partner", type="primary"):
         if pp_name != "None" and pp_name not in [n for n, _ in st.session_state.pending_partners]:
             st.session_state.pending_partners.append((pp_name, pp_rounds))
             st.rerun()
