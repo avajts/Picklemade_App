@@ -341,9 +341,7 @@ with tab1:
 
         round_nums = [f"Game {r.round_num}" for r in rounds]
         view_all   = st.checkbox("Show all games", value=True)
-        for court in r.courts:
-                mode = config.get_court_mode(r.round_num, court.court_num) if 'config' in dir() else "mixed"
-
+        
         if view_all:
             selected_rounds = rounds
         else:
