@@ -326,7 +326,7 @@ def _score_fallback_court(
 #  Couple pre-assignment helpers
 # ─────────────────────────────────────────────
 
-ddef _extract_couple_pairs(
+def _extract_couple_pairs(
     available:        list[Player],
     round_num:        int,
     couple_scheduler: CoupleScheduler,
