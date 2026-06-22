@@ -40,7 +40,7 @@ class Player:
     def __eq__(self, other):
         return isinstance(other, Player) and self.name == other.name
     
-     def __repr__(self):
+    def __repr__(self):
         partners = f", partners={self.preferred_partners}" if self.preferred_partners else ""
         avoid    = f", avoids={self.avoid_partner}" if self.avoid_partner else ""
         rating   = f", rating={self.duper_rating}" if self.duper_rating is not None else ""
