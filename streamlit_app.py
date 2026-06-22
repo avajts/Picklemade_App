@@ -518,7 +518,13 @@ with tab1:
         # ── Render each round ────────────────
         for r in selected_rounds:
             sit_names = [p.name for p in r.sit_outs]
-
+            leftover_for_this_round = next(
+                (c.court_num for c in r.courts
+                 if c.mode == "mixed" and any(
+                     getattr(p, "duper_rating", None) is not None for p in c.all_players
+                 )),
+                None
+            )
 
             # Build court cells HTML
             cells_html = ""
@@ -531,9 +537,11 @@ with tab1:
                 warn_t1 = " ⚠️ same gender" if (not t1.is_mixed and st.session_state.get("game_mode", "mixed") == "mixed") else ""
                 warn_t2 = " ⚠️ same gender" if (not t2.is_mixed and st.session_state.get("game_mode", "mixed") == "mixed") else ""
                 
+                is_leftover = (court.court_num == leftover_for_this_round and mode_icon == "⚧")
+                skill_tag   = " 🎯" if is_leftover else ""
                 cells_html += f"""
                 <div class="court-cell">
-                    <div class="court-title">{mode_icon} Court {court.court_num}</div>
+                    <div class="court-title">{mode_icon} Court {court.court_num}{skill_tag}</div>
                     <div class="team-name">{t1_str}{warn_t1}</div>
                     <div class="vs-label">vs</div>
                     <div class="team-name">{t2_str}{warn_t2}</div>

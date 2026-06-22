@@ -115,23 +115,50 @@ def _greedy_fill(
 ) -> list[CourtAssignment] | None:
     """
     Attempt to fill all courts greedily for one round.
-    Respects per-court gender overrides — courts with a forced mode
-    pull only from the matching gender pool.
+    Respects per-court gender overrides and skill-balances the
+    leftover mixed court when applicable.
     """
     remaining = available[:]
     courts    = []
 
-    # ── Step A: lock in couple pre-assignments (unchanged) ───────────────────
+    # ── Step A: lock in couple pre-assignments ────────────────────────────────
     locked_pairs, remaining = _extract_couple_pairs(remaining, round_num, couple_scheduler)
     court_slots = _pair_up_locked(locked_pairs)
     while len(court_slots) < config.num_courts:
         court_slots.append([])
 
-    # ── Step B: fill each court, respecting its override mode ───────────────
-    for i, slot in enumerate(court_slots):
-        court_num   = i + 1
-        court_mode  = config.get_court_mode(round_num, court_num)
+    # ── Step B: identify leftover mixed court (if any) ───────────────────────
+    leftover_court_num = _identify_leftover_mixed_court(config, round_num)
 
+    # Check if a couple already claimed that court — if so, skip skill balance
+    leftover_claimed_by_couple = False
+    if leftover_court_num is not None:
+        slot_index = leftover_court_num - 1
+        if slot_index < len(court_slots) and len(court_slots[slot_index]) > 0:
+            leftover_claimed_by_couple = True
+
+    skill_balance_applied = False
+
+    # ── Step C: fill each court ────────────────────────────────────────────────
+    for i, slot in enumerate(court_slots):
+        court_num  = i + 1
+        court_mode = config.get_court_mode(round_num, court_num)
+
+        # Try skill-balancing the leftover court first (if eligible)
+        if (
+            court_num == leftover_court_num
+            and not leftover_claimed_by_couple
+            and not skill_balance_applied
+        ):
+            balanced_court = _apply_skill_balance(court_num, remaining, round_num, tracker)
+            if balanced_court is not None:
+                courts.append(balanced_court)
+                used_players = balanced_court.all_players
+                remaining = [p for p in remaining if p not in used_players]
+                skill_balance_applied = True
+                continue   # move to next court
+
+        # Normal fill path
         if len(remaining) < (4 - len(slot) * 2):
             return None
 
@@ -409,6 +436,81 @@ def _best_effort_fill(
         ))
 
     return courts
+
+def _identify_leftover_mixed_court(
+    config:     ScheduleConfig,
+    round_num:  int,
+) -> int | None:
+    """
+    Returns the court_num of the single leftover mixed court for this round,
+    if exactly one mixed court exists alongside forced single-gender courts.
+    Returns None if no such leftover court applies (e.g. all courts are mixed,
+    or multiple mixed courts exist).
+    """
+    modes = [
+        (c, config.get_court_mode(round_num, c))
+        for c in range(1, config.num_courts + 1)
+    ]
+    mixed_courts  = [c for c, m in modes if m == "mixed"]
+    forced_courts = [c for c, m in modes if m != "mixed"]
+
+    if len(mixed_courts) == 1 and len(forced_courts) >= 1:
+        return mixed_courts[0]
+    return None
+
+
+def _apply_skill_balance(
+    leftover_court_num: int,
+    remaining:           list[Player],
+    round_num:           int,
+    tracker:             ConstraintTracker,
+) -> CourtAssignment | None:
+    """
+    Builds the leftover mixed court by pairing the highest-rated available
+    woman with the lowest-rated available man, then filling team2 from the
+    best-fitting remaining players.
+
+    Returns None if there isn't enough rating data to skill-balance
+    (caller should fall back to normal scoring in that case).
+    """
+    women = [p for p in remaining if p.gender == "F" and p.duper_rating is not None]
+    men   = [p for p in remaining if p.gender == "M" and p.duper_rating is not None]
+
+    if len(women) < 1 or len(men) < 2:
+        return None   # not enough rated players — fall back to normal scoring
+
+    # Highest-rated woman
+    top_woman = max(women, key=lambda p: p.duper_rating)
+
+    # Two lowest-rated men
+    sorted_men = sorted(men, key=lambda p: p.duper_rating)
+    if len(sorted_men) < 2:
+        return None
+    low_man_1, low_man_2 = sorted_men[0], sorted_men[1]
+
+    team1_players = [top_woman, low_man_1]
+
+    # Team 2: best remaining woman (if any) + the second low-rated man
+    remaining_women = [p for p in women if p.name != top_woman.name]
+    if remaining_women:
+        team2_partner = max(remaining_women, key=lambda p: p.duper_rating)
+    else:
+        # No second woman available among rated players — pull any available woman
+        any_women = [p for p in remaining if p.gender == "F" and p.name != top_woman.name]
+        team2_partner = any_women[0] if any_women else None
+
+    if team2_partner is None:
+        return None   # not enough women to fill both teams — fall back
+
+    team2_players = [low_man_2, team2_partner]
+
+    court = CourtAssignment(
+        court_num=leftover_court_num,
+        team1=Team(team1_players),
+        team2=Team(team2_players),
+        mode="mixed",
+    )
+    return court
 
 if __name__ == "__main__":
     from models import Player, ScheduleConfig
