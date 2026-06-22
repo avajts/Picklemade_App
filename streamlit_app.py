@@ -56,6 +56,30 @@ def session_players() -> list[Player]:
         for p in st.session_state.players
     ]
 
+def recompute_all_stats(rounds, players, config):
+    """
+    Rebuilds the constraint tracker and sit-out summary from a (possibly edited)
+    schedule. Call this any time the schedule is manually changed.
+    """
+    from constraints import ConstraintTracker
+    from utils import CoupleScheduler
+
+    cs = CoupleScheduler(config)
+    cs.assign_rounds()
+    tracker = ConstraintTracker(config, cs)
+
+    for r in rounds:
+        tracker.update_round(r.courts, r.round_num)
+
+    sit_summary = {}
+    for r in rounds:
+        for p in r.sit_outs:
+            sit_summary[p.name] = sit_summary.get(p.name, 0) + 1
+    for pl in players:
+        if pl.name not in sit_summary:
+            sit_summary[pl.name] = 0
+
+    return tracker, sit_summary
 
 # ─────────────────────────────────────────────
 #  Sidebar — Setup
@@ -222,6 +246,7 @@ with st.sidebar:
             couple_rounds=couple_rounds,
             game_mode=st.session_state.get("game_mode", "mixed"),
             court_overrides=st.session_state.get("court_overrides", {}),    # ← add
+            st.session_state.last_config = config,
         )
 
         errors = validate_config(config)
@@ -300,7 +325,7 @@ if st.session_state.warnings:
             st.warning(w)
 
 # ── Tabs ─────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["📅 Schedule", "🏆 Stats", "📊 Pair Matrix"])
+tab1, tab2, tab3, tab4 = st.tabs(["📅 Schedule", "🏆 Stats", "📊 Pair Matrix", "✏️ Edit Schedule"])
 
 # ═══════════════════════════════════════════
 #  Tab 1 — Schedule
@@ -636,6 +661,149 @@ with tab3:
         pd.DataFrame(opp_matrix, index=names, columns=names),
         use_container_width=True,
     )
+
+# ═══════════════════════════════════════════
+#  Tab 4 -- The Editor
+# ═══════════════════════════════════════════
+with tab4:
+    if st.session_state.schedule is None:
+        st.info("Generate a schedule first.")
+    else:
+        rounds  = st.session_state.schedule
+        players = session_players()
+        player_lookup = {p.name: p for p in players}
+
+        st.subheader("✏️ Edit Schedule")
+        st.caption("Swap two players, or fully reassign a round. Stats update automatically after any change.")
+
+        round_options = [r.round_num for r in rounds]
+        edit_round_num = st.selectbox("Select round to edit", round_options, key="edit_round_select")
+        edit_round = next(r for r in rounds if r.round_num == edit_round_num)
+
+        edit_mode = st.radio("Edit mode", ["🔁 Quick Swap", "🛠️ Full Manual Edit"], horizontal=True)
+
+        # ═══════════════════════════════
+        # QUICK SWAP MODE
+        # ═══════════════════════════════
+        if edit_mode == "🔁 Quick Swap":
+            st.markdown("**Swap two players' positions within this round** (including swapping with a sit-out).")
+
+            # Build a flat list of (label, court_num, team_num, slot_num) for everyone in this round
+            slot_options = []
+            for court in edit_round.courts:
+                for team_num, team in enumerate([court.team1, court.team2], start=1):
+                    for slot_num, p in enumerate(team.players, start=1):
+                        label = f"{p.name} (Court {court.court_num}, Team {team_num})"
+                        slot_options.append((label, court.court_num, team_num, slot_num, p.name))
+            for p in edit_round.sit_outs:
+                label = f"{p.name} (Sitting Out)"
+                slot_options.append((label, None, None, None, p.name))
+
+            col_a, col_b = st.columns(2)
+            choice_a = col_a.selectbox("Player A", [s[0] for s in slot_options], key="swap_a")
+            choice_b = col_b.selectbox("Player B", [s[0] for s in slot_options], key="swap_b")
+
+            if st.button("🔁 Swap Players", type="primary"):
+                if choice_a == choice_b:
+                    st.warning("Select two different players to swap.")
+                else:
+                    a_data = next(s for s in slot_options if s[0] == choice_a)
+                    b_data = next(s for s in slot_options if s[0] == choice_b)
+                    _, a_court, a_team, a_slot, a_name = a_data
+                    _, b_court, b_team, b_slot, b_name = b_data
+
+                    def get_player_obj(court_num, team_num, slot_num, sit_name):
+                        if court_num is None:
+                            return None  # sit-out case handled separately
+                        court = next(c for c in edit_round.courts if c.court_num == court_num)
+                        team  = court.team1 if team_num == 1 else court.team2
+                        return team.players[slot_num - 1]
+
+                    def set_player(court_num, team_num, slot_num, new_player):
+                        court = next(c for c in edit_round.courts if c.court_num == court_num)
+                        team  = court.team1 if team_num == 1 else court.team2
+                        team.players[slot_num - 1] = new_player
+
+                    a_player = player_lookup[a_name]
+                    b_player = player_lookup[b_name]
+
+                    # Both on courts — straightforward swap
+                    if a_court is not None and b_court is not None:
+                        set_player(a_court, a_team, a_slot, b_player)
+                        set_player(b_court, b_team, b_slot, a_player)
+
+                    # A on court, B sitting out — bring B in, send A to bench
+                    elif a_court is not None and b_court is None:
+                        set_player(a_court, a_team, a_slot, b_player)
+                        edit_round.sit_outs.remove(b_player if b_player in edit_round.sit_outs else
+                                                    next(p for p in edit_round.sit_outs if p.name == b_name))
+                        edit_round.sit_outs.append(a_player)
+
+                    # B on court, A sitting out — mirror of above
+                    elif b_court is not None and a_court is None:
+                        set_player(b_court, b_team, b_slot, a_player)
+                        edit_round.sit_outs.remove(next(p for p in edit_round.sit_outs if p.name == a_name))
+                        edit_round.sit_outs.append(b_player)
+
+                    # Recompute everything
+                    config = st.session_state.get("last_config")
+                    tracker, sit_summary = recompute_all_stats(rounds, players, config)
+                    st.session_state.schedule    = rounds
+                    st.session_state.tracker     = tracker
+                    st.session_state.sit_summary = sit_summary
+                    st.success(f"Swapped {a_name} and {b_name} in Round {edit_round_num}!")
+                    st.rerun()
+
+        # ═══════════════════════════════
+        # FULL MANUAL EDIT MODE
+        # ═══════════════════════════════
+        else:
+            st.markdown(f"**Reassign every player for Round {edit_round_num}.**")
+            st.caption("Every player in your roster appears in each dropdown — make sure no one is selected twice.")
+
+            all_names = [p.name for p in players]
+            new_assignments = {}  # (court_num, team_num, slot_num) -> name
+
+            for court in edit_round.courts:
+                st.markdown(f"**Court {court.court_num}**")
+                c1, c2, c3, c4 = st.columns(4)
+                cols = [c1, c2, c3, c4]
+                idx = 0
+                for team_num, team in enumerate([court.team1, court.team2], start=1):
+                    for slot_num, p in enumerate(team.players, start=1):
+                        key = f"manual_{edit_round_num}_{court.court_num}_{team_num}_{slot_num}"
+                        selected = cols[idx].selectbox(
+                            f"T{team_num}P{slot_num}",
+                            all_names,
+                            index=all_names.index(p.name) if p.name in all_names else 0,
+                            key=key,
+                            label_visibility="collapsed",
+                        )
+                        new_assignments[(court.court_num, team_num, slot_num)] = selected
+                        idx += 1
+                st.divider()
+
+            if st.button("💾 Save Manual Changes", type="primary"):
+                chosen_names = list(new_assignments.values())
+                if len(chosen_names) != len(set(chosen_names)):
+                    st.error("⚠️ The same player is assigned to multiple slots. Please fix before saving.")
+                else:
+                    for (court_num, team_num, slot_num), name in new_assignments.items():
+                        court = next(c for c in edit_round.courts if c.court_num == court_num)
+                        team  = court.team1 if team_num == 1 else court.team2
+                        team.players[slot_num - 1] = player_lookup[name]
+
+                    # Recompute sit-outs: anyone not assigned to a court slot this round sits out
+                    assigned_names = set(chosen_names)
+                    edit_round.sit_outs = [p for p in players if p.name not in assigned_names]
+
+                    config = st.session_state.get("last_config")
+                    tracker, sit_summary = recompute_all_stats(rounds, players, config)
+                    st.session_state.schedule    = rounds
+                    st.session_state.tracker     = tracker
+                    st.session_state.sit_summary = sit_summary
+                    st.success(f"Round {edit_round_num} updated!")
+                    st.rerun()
 
 # ─────────────────────────────────────────────
 #  Footer
