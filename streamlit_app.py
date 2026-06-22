@@ -247,7 +247,7 @@ with st.sidebar:
             game_mode=st.session_state.get("game_mode", "mixed"),
             court_overrides=st.session_state.get("court_overrides", {}),
         )
-        st.session_state.last_config = config,
+        st.session_state.last_config = config
 
         errors = validate_config(config)
         if errors:
@@ -341,7 +341,7 @@ with tab1:
 
         round_nums = [f"Game {r.round_num}" for r in rounds]
         view_all   = st.checkbox("Show all games", value=True)
-        
+
         if view_all:
             selected_rounds = rounds
         else:
