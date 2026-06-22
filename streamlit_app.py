@@ -154,20 +154,40 @@ with st.sidebar:
     # ── Add player form ──────────────────────
     st.markdown("##### 👤 Add Player")
 
-    # Persist gender across resets (it's the one field we keep)
     if "persisted_gender" not in st.session_state:
         st.session_state.persisted_gender = "F"
+    if "pending_partners" not in st.session_state:
+        st.session_state.pending_partners = []
 
     existing_names = [p["name"] for p in st.session_state.players]
 
-    # ── Preferred partners builder (outside form — needs dynamic rows) ──
-    if "pending_partners" not in st.session_state:
-        st.session_state.pending_partners = []   # list of (name, rounds) for the NEXT player being added
+    # Name + Gender
+    if game_mode == "mixed":
+        col_name, col_gender = st.columns([3, 1])
+        form_name = col_name.text_input(
+            "Name", placeholder="e.g. Alice", label_visibility="collapsed", key="new_player_name"
+        )
+        form_gender = col_gender.selectbox(
+            "Gender", ["F", "M"],
+            index=["F", "M"].index(st.session_state.persisted_gender),
+            label_visibility="collapsed", key="new_player_gender",
+        )
+    else:
+        form_name = st.text_input(
+            "Name", placeholder="e.g. Alice", label_visibility="collapsed", key="new_player_name"
+        )
+        form_gender = "F" if game_mode == "womens" else "M"
 
+    # Preferred Partners — directly under Name, before Avoid
     st.markdown("**Preferred partners** (optional)")
     pp_col1, pp_col2, pp_col3 = st.columns([2, 1, 1])
-    pp_name   = pp_col1.selectbox("Partner", ["None"] + existing_names, key="pp_name_select", label_visibility="collapsed")
-    pp_rounds = pp_col2.number_input("Rounds", min_value=1, max_value=int(num_rounds), value=1, key="pp_rounds_input", label_visibility="collapsed")
+    pp_name = pp_col1.selectbox(
+        "Partner", ["None"] + existing_names, key="pp_name_select", label_visibility="collapsed"
+    )
+    pp_rounds = pp_col2.number_input(
+        "Rounds", min_value=1, max_value=int(num_rounds), value=1,
+        key="pp_rounds_input", label_visibility="collapsed"
+    )
     if pp_col3.button("➕", key="pp_add_btn", help="Add this preferred partner"):
         if pp_name != "None" and pp_name not in [n for n, _ in st.session_state.pending_partners]:
             st.session_state.pending_partners.append((pp_name, pp_rounds))
@@ -181,43 +201,35 @@ with st.sidebar:
                 st.session_state.pending_partners.pop(i)
                 st.rerun()
 
-    with st.form(key="add_player_form", clear_on_submit=True):
-        if game_mode == "mixed":
-            col_name, col_gender = st.columns([3, 1])
-            form_name   = col_name.text_input("Name", placeholder="e.g. Alice", label_visibility="collapsed")
-            form_gender = col_gender.selectbox(
-                "Gender", ["F", "M"],
-                index=["F", "M"].index(st.session_state.persisted_gender),
-                label_visibility="collapsed",
-            )
-        else:
-            form_name   = st.text_input("Name", placeholder="e.g. Alice", label_visibility="collapsed")
-            form_gender = "F" if game_mode == "womens" else "M"
+    # Avoid Partner
+    avoid_excluded = [n for n, _ in st.session_state.pending_partners]
+    avoid_options  = ["None"] + [n for n in existing_names if n not in avoid_excluded]
+    form_avoid = st.selectbox(
+        "Avoids partnering with",
+        avoid_options,
+        help="This player will never be placed on the same team as the selected player.",
+        key="new_player_avoid",
+    )
 
-        avoid_excluded = [n for n, _ in st.session_state.pending_partners]
-        avoid_options  = ["None"] + [n for n in existing_names if n not in avoid_excluded]
-        form_avoid = st.selectbox(
-            "Avoids partnering with",
-            avoid_options,
-            help="This player will never be placed on the same team as the selected player.",
-        )
+    # Duper Rating
+    form_rating = st.number_input(
+        "Duper rating (optional)",
+        min_value=0.0, max_value=7.0, value=0.0, step=0.01, format="%.2f",
+        help="Skill rating from 0.0 to 7.0. Leave at 0.0 if unknown.",
+        key="new_player_rating",
+    )
 
-        form_rating = st.number_input(
-            "Duper rating (optional)",
-            min_value=0.0, max_value=7.0, value=0.0, step=0.01, format="%.2f",
-            help="Skill rating from 0.0 to 7.0. Leave at 0.0 if unknown.",
-        )
+    # Submit button
+    add_clicked = st.button("➕ Add Player", type="primary", use_container_width=True)
 
-        submitted = st.form_submit_button("➕ Add Player", type="primary", use_container_width=True)
-    
-    if submitted:
+    if add_clicked:
         name = form_name.strip()
         if not name:
             st.warning("Please enter a player name.")
         elif name in existing_names:
             st.warning(f"'{name}' is already in the list.")
         else:
-            partners_list = list(st.session_state.pending_partners)   # [(name, rounds), ...]
+            partners_list = list(st.session_state.pending_partners)
 
             st.session_state.players.append({
                 "name":               name,
@@ -227,7 +239,6 @@ with st.sidebar:
                 "duper_rating":       form_rating if form_rating > 0.0 else None,
             })
 
-            # Sync the relationship on each partner's existing record too
             for partner_name, rounds in partners_list:
                 for p in st.session_state.players:
                     if p["name"] == partner_name:
@@ -235,8 +246,14 @@ with st.sidebar:
                         existing[name] = rounds
                         p["preferred_partners"] = list(existing.items())
 
-            st.session_state.persisted_gender   = form_gender
-            st.session_state.pending_partners   = []   # reset for next player
+            st.session_state.persisted_gender = form_gender
+            st.session_state.pending_partners = []
+
+            # Manually clear the input fields since we're not using a form anymore
+            st.session_state.new_player_name = ""
+            st.session_state.pp_rounds_input = 1
+            st.session_state.new_player_rating = 0.0
+
             st.success(f"Added {name}!")
             st.rerun()
 
