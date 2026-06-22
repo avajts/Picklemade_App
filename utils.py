@@ -29,9 +29,9 @@ class SitOutRotation:
         self.config = config
         self.sit_out_count: dict[str, int] = {p.name: 0 for p in config.players}
 
-        # Build a fast lookup: player_name -> couple_;artner_name (or None)
-        self.couple_map: dict[str, str | None] = {
-            p.name: p.couple_partner for p in config.players
+        # Build a fast lookup: player_name -> list of all their preferred partner names
+        self.couple_map: dict[str, list[str]] = {
+            p.name: [name for name, _ in p.preferred_partners] for p in config.players
         }
 
     # ---- Public API ------
@@ -87,17 +87,23 @@ class SitOutRotation:
             if p.name in chosen_names:
                 continue
  
-            partner_name = self.couple_map.get(p.name)
- 
-            # If this player has a coupled partner also in the candidate pool,
+            partner_names = self.couple_map.get(p.name, [])
+
+            # If this player has any preferred partner also in the candidate pool,
             # and we still have room for both — sit them out together.
-            if partner_name and partner_name not in chosen_names:
-                partner = self._get_player(partner_name)
-                if partner and len(chosen) + 2 <= n:
-                    chosen.append(p)
-                    chosen.append(partner)
-                    chosen_names.update([p.name, partner_name])
-                    continue
+            matched = False
+            for partner_name in partner_names:
+                if partner_name not in chosen_names:
+                    partner = self._get_player(partner_name)
+                    if partner and len(chosen) + 2 <= n:
+                        chosen.append(p)
+                        chosen.append(partner)
+                        chosen_names.update([p.name, partner_name])
+                        matched = True
+                        break
+
+            if matched:
+                continue
  
             # Otherwise just add this player individually
             chosen.append(p)
