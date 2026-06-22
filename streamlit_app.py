@@ -228,12 +228,24 @@ with st.sidebar:
     # ── Auto-focus the name field after submission ──────────
     st.markdown("""
     <script>
-        setTimeout(function() {
-            const sidebarInputs = window.parent.document.querySelectorAll(
-                'section[data-testid="stSidebar"] input[type="text"]'
-            );
-            if (sidebarInputs.length > 0) {
-                sidebarInputs[0].focus();
+        function focusNameField() {
+            try {
+                const inputs = window.parent.document.querySelectorAll(
+                    'section[data-testid="stSidebar"] input[type="text"]'
+                );
+                if (inputs.length > 0) {
+                    inputs[0].focus();
+                    return true;
+                }
+            } catch (e) {}
+            return false;
+        }
+
+        let attempts = 0;
+        const interval = setInterval(function() {
+            attempts++;
+            if (focusNameField() || attempts > 20) {
+                clearInterval(interval);
             }
         }, 100);
     </script>
