@@ -24,10 +24,15 @@ class Player:
     couple_partner: str | None = None # name of their coupled partner, if any
     avoid_partner: str | None = None 
     game_mode: str = "mixed" 
+    duper_rating: float | None = None   
 
     def __post_init__(self):
         self.gender = self.gender.upper()
         assert self.gender in ("M", "F"), f"Gender must be 'M' or 'F', got '{self.gender}'"
+        if self.duper_rating is not None:
+            assert 0.0 <= self.duper_rating <= 7.0, (
+                f"Duper rating must be between 0.0 and 7.0, got {self.duper_rating}"
+            )
 
     def __hash__(self):
         return hash(self.name)
@@ -37,7 +42,9 @@ class Player:
     
     def __repr__(self):
         couple = f", partner={self.couple_partner}" if self.couple_partner else ""
-        return f"Player({self.name}, {self.gender}{couple})"
+        avoid  = f", avoids={self.avoid_partner}" if self.avoid_partner else ""
+        rating = f", rating={self.duper_rating}" if self.duper_rating is not None else ""
+        return f"Player({self.name}, {self.gender}{couple}{avoid}{rating})"
     
 # Team
 

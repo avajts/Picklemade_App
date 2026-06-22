@@ -51,6 +51,7 @@ def session_players() -> list[Player]:
             gender=p["gender"],
             couple_partner=p["couple_partner"] or None,
             avoid_partner=p.get("avoid_partner") or None,
+            duper_rating=p.get("duper_rating"),
         )
         for p in st.session_state.players
     ]
@@ -89,6 +90,12 @@ with st.sidebar:
         new_name   = st.text_input("Name", placeholder="e.g. Alice", label_visibility="collapsed")
         new_gender = "F" if game_mode == "womens" else "M"
     
+    new_rating = st.number_input(
+        "Duper rating (optional)",
+        min_value=0.0, max_value=7.0, value=0.0, step=0.01, format="%.2f",
+        help="Skill rating from 0.0 to 7.0. Leave at 0.0 if unknown.",
+    )
+
     existing_names = [p["name"] for p in st.session_state.players]
     couple_options = ["None"] + existing_names
     new_couple = st.selectbox(
@@ -126,6 +133,7 @@ with st.sidebar:
                 "couple_partner": partner,
                 "couple_rounds":  new_couple_rounds if partner else 0,
                 "avoid_partner":  new_avoid if new_avoid != "None" else None, 
+                "duper_rating":   new_rating if new_rating > 0.0 else None, 
             })
             if partner:
                 for p in st.session_state.players:
@@ -145,7 +153,8 @@ with st.sidebar:
             gender_icon = "👩" if p["gender"] == "F" else "👨"
             couple_tag  = f" 💑 {p['couple_partner']}" if p["couple_partner"] else ""
             avoid_tag   = f" 🚫 {p['avoid_partner']}" if p.get("avoid_partner") else ""
-            c1.markdown(f"{gender_icon} **{p['name']}**{couple_tag}{avoid_tag}")
+            rating_tag  = f" 🎯 {p['duper_rating']:.2f}" if p.get("duper_rating") else ""
+            c1.markdown(f"{gender_icon} **{p['name']}**{couple_tag}{avoid_tag}{rating_tag}")
             if c2.button("❌", key=f"del_{i}"):
                 removed = st.session_state.players.pop(i)
                 if removed["couple_partner"]:

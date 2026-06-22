@@ -313,6 +313,15 @@ def validate_config(config: ScheduleConfig) -> list[str]:
                         f"are listed as both a couple and an avoid pair."
                     )
 
+    # ── Duper rating validation ───────────────
+    for p in config.players:
+        if p.duper_rating is not None:
+            if not (0.0 <= p.duper_rating <= 7.0):
+                errors.append(
+                    f"Duper rating error: '{p.name}' has rating {p.duper_rating}, "
+                    f"must be between 0.0 and 7.0."
+                )
+
     return errors
 
 
