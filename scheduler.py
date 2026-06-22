@@ -244,19 +244,19 @@ def _score_with_locked_team(
         females = [p for p in pool if p.gender == "F"]
         for m in males:
             for f in females:
-                court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([m, f]))
+                court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([m, f]), mode=court_mode)
                 score = tracker.score_assignment(court, round_num)
                 scored.append((score, court, locked + [m, f]))
     elif court_mode == "womens":
         candidates_pool = [p for p in pool if p.gender == "F"]
         for p1, p2 in combinations(candidates_pool, 2):
-            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]))
+            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]), mode=court_mode)
             score = tracker.score_assignment(court, round_num)
             scored.append((score, court, locked + [p1, p2]))
     elif court_mode == "mens":
         candidates_pool = [p for p in pool if p.gender == "M"]
         for p1, p2 in combinations(candidates_pool, 2):
-            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]))
+            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]), mode=court_mode)
             score = tracker.score_assignment(court, round_num)
             scored.append((score, court, locked + [p1, p2]))
 
