@@ -115,29 +115,28 @@ def _greedy_fill(
 ) -> list[CourtAssignment] | None:
     """
     Attempt to fill all courts greedily for one round.
-    Returns a list of CourtAssignments, or None if it gets stuck.
+    Respects per-court gender overrides — courts with a forced mode
+    pull only from the matching gender pool.
     """
-    remaining  = available[:]
-    courts     = []
-    court_num  = 1
+    remaining = available[:]
+    courts    = []
 
-    # ── Step A: lock in couple pre-assignments ───────────────────────────────
+    # ── Step A: lock in couple pre-assignments (unchanged) ───────────────────
     locked_pairs, remaining = _extract_couple_pairs(remaining, round_num, couple_scheduler)
-
-    # ── Step B: fill each court ──────────────────────────────────────────────
-    # Pair up locked couples first into court slots, then fill with free players
-    court_slots = _pair_up_locked(locked_pairs)  # list of partial courts (1 team locked)
-
-    # Pad with empty slots if we have fewer locked pairs than courts
+    court_slots = _pair_up_locked(locked_pairs)
     while len(court_slots) < config.num_courts:
-        court_slots.append([])   # empty slot = needs both teams from remaining pool
+        court_slots.append([])
 
+    # ── Step B: fill each court, respecting its override mode ───────────────
     for i, slot in enumerate(court_slots):
+        court_num   = i + 1
+        court_mode  = config.get_court_mode(round_num, court_num)
+
         if len(remaining) < (4 - len(slot) * 2):
             return None
 
         court, remaining = _fill_court(
-            slot, remaining, i + 1, round_num, tracker
+            slot, remaining, court_num, round_num, tracker, court_mode
         )
         if court is None:
             return None
@@ -152,34 +151,27 @@ def _greedy_fill(
 # ─────────────────────────────────────────────
 
 def _fill_court(
-    slot:         list,            # [], [[p1,p2]], or [[p1,p2],[p3,p4]]
+    slot:         list,
     remaining:    list[Player],
     court_num:    int,
     round_num:    int,
     tracker:      ConstraintTracker,
+    court_mode:   str = "mixed",      # ← new parameter
 ) -> tuple[CourtAssignment | None, list[Player]]:
 
-    # Case 1 — two couples already fill the whole court
     if len(slot) == 2:
-        team1_players = slot[0]    # [Player, Player]
-        team2_players = slot[1]    # [Player, Player]
         court = CourtAssignment(
             court_num=court_num,
-            team1=Team(team1_players),
-            team2=Team(team2_players),
+            team1=Team(slot[0]),
+            team2=Team(slot[1]),
+            mode=court_mode, 
         )
         return court, remaining
 
-    # Case 2 — one couple fills team1, find best team2 from remaining
     if len(slot) == 1:
-        locked_team = slot[0]      # [Player, Player]
-        candidates = _score_with_locked_team(
-            locked_team, remaining, court_num, round_num, tracker
-        )
-
-    # Case 3 — no couples, fill both teams from remaining pool
+        candidates = _score_with_locked_team(slot[0], remaining, court_num, round_num, tracker, court_mode)
     else:
-        candidates = _score_open_court(remaining, court_num, round_num, tracker)
+        candidates = _score_open_court(remaining, court_num, round_num, tracker, court_mode)
 
     if not candidates:
         return None, remaining
@@ -192,17 +184,16 @@ def _fill_court(
     return chosen_court, updated_remaining
 
 def _score_open_court(
-    pool:      list[Player],
-    court_num: int,
-    round_num: int,
-    tracker:   ConstraintTracker,
+    pool:        list[Player],
+    court_num:   int,
+    round_num:   int,
+    tracker:     ConstraintTracker,
+    court_mode:  str = "mixed",       # ← new parameter
 ) -> list[tuple[int, CourtAssignment, list[Player]]]:
 
     scored = []
-    mode = tracker.config.game_mode
 
-    if mode == "mixed":
-        # Try all mixed assignments first
+    if court_mode == "mixed":
         males   = [p for p in pool if p.gender == "M"]
         females = [p for p in pool if p.gender == "F"]
 
@@ -216,56 +207,62 @@ def _score_open_court(
                         court_num=court_num,
                         team1=Team(team1_players),
                         team2=Team(team2_players),
+                        mode=court_mode, 
                     )
                     score = tracker.score_assignment(court, round_num)
                     scored.append((score, court, team1_players + team2_players))
 
-        # Fallback if no mixed option exists
         if not scored:
             scored = _score_fallback_court(pool, court_num, round_num, tracker)
 
-    else:
-        # Single gender — score all combinations directly
-        scored = _score_fallback_court(pool, court_num, round_num, tracker)
+    elif court_mode == "womens":
+        women_only = [p for p in pool if p.gender == "F"]
+        scored = _score_fallback_court(women_only, court_num, round_num, tracker)
+
+    elif court_mode == "mens":
+        men_only = [p for p in pool if p.gender == "M"]
+        scored = _score_fallback_court(men_only, court_num, round_num, tracker)
 
     scored.sort(key=lambda x: x[0], reverse=True)
     return scored
 
 
 def _score_with_locked_team(
-    locked:    list[Player],   # 2 players already forming team1
-    pool:      list[Player],
-    court_num: int,
-    round_num: int,
-    tracker:   ConstraintTracker,
+    locked:      list[Player],
+    pool:        list[Player],
+    court_num:   int,
+    round_num:   int,
+    tracker:     ConstraintTracker,
+    court_mode:  str = "mixed",       # ← new parameter
 ) -> list[tuple[int, CourtAssignment, list[Player]]]:
-    """
-    Score all valid team2 options from pool, given team1 is locked.
-    Prefers mixed team2; falls back to same-gender.
-    """
-    team1   = Team(locked)
-    males   = [p for p in pool if p.gender == "M"]
-    females = [p for p in pool if p.gender == "F"]
-    scored  = []
 
-    for m in males:
-        for f in females:
-            court = CourtAssignment(
-                court_num=court_num,
-                team1=team1,
-                team2=Team([m, f]),
-            )
+    team1  = Team(locked)
+    scored = []
+
+    if court_mode == "mixed":
+        males   = [p for p in pool if p.gender == "M"]
+        females = [p for p in pool if p.gender == "F"]
+        for m in males:
+            for f in females:
+                court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([m, f]), mode=court_mode,)
+                score = tracker.score_assignment(court, round_num)
+                scored.append((score, court, locked + [m, f]))
+    elif court_mode == "womens":
+        candidates_pool = [p for p in pool if p.gender == "F"]
+        for p1, p2 in combinations(candidates_pool, 2):
+            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]), mode=court_mode, )
             score = tracker.score_assignment(court, round_num)
-            scored.append((score, court, locked + [m, f]))
+            scored.append((score, court, locked + [p1, p2]))
+    elif court_mode == "mens":
+        candidates_pool = [p for p in pool if p.gender == "M"]
+        for p1, p2 in combinations(candidates_pool, 2):
+            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]), mode=court_mode, )
+            score = tracker.score_assignment(court, round_num)
+            scored.append((score, court, locked + [p1, p2]))
 
     if not scored:
-        # Fallback — any pair from pool
         for p1, p2 in combinations(pool, 2):
-            court = CourtAssignment(
-                court_num=court_num,
-                team1=team1,
-                team2=Team([p1, p2]),
-            )
+            court = CourtAssignment(court_num=court_num, team1=team1, team2=Team([p1, p2]), mode=court_mode, )
             score = tracker.score_assignment(court, round_num)
             scored.append((score, court, locked + [p1, p2]))
 
@@ -290,6 +287,7 @@ def _score_fallback_court(
                 court_num=court_num,
                 team1=Team(list(t1)),
                 team2=Team(list(t2)),
+                mode=court_mode, 
             )
             score = tracker.score_assignment(court, round_num)
             scored.append((score, court, list(group)))
@@ -406,6 +404,7 @@ def _best_effort_fill(
             court_num=court_num,
             team1=Team(list(best[0])),
             team2=Team(list(best[1])),
+            mode=court_mode, 
         ))
 
     return courts

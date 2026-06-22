@@ -80,6 +80,34 @@ with st.sidebar:
 
     st.divider()
 
+    # ── Per-round court gender overrides ──────
+    with st.expander("🎛️ Advanced: Per-Round Court Overrides"):
+        st.caption(
+            "Override the gender mode for specific courts in specific rounds. "
+            "Leave as 'Default' to use the global game mode above."
+        )
+
+        if "court_overrides" not in st.session_state:
+            st.session_state.court_overrides = {}
+
+        for r in range(1, int(num_rounds) + 1):
+            cols = st.columns(int(num_courts) + 1)
+            cols[0].markdown(f"**Round {r}**")
+            for c in range(1, int(num_courts) + 1):
+                key = (r, c)
+                current = st.session_state.court_overrides.get(key, "default")
+                choice = cols[c].selectbox(
+                    f"R{r}C{c}",
+                    options=["default", "mixed", "womens", "mens"],
+                    index=["default", "mixed", "womens", "mens"].index(current),
+                    key=f"override_{r}_{c}",
+                    label_visibility="collapsed",
+                )
+                if choice == "default":
+                    st.session_state.court_overrides.pop(key, None)
+                else:
+                    st.session_state.court_overrides[key] = choice
+
     # ── Add player form ──────────────────────
     st.subheader("👤 Add Player")
     if game_mode == "mixed":
@@ -192,7 +220,8 @@ with st.sidebar:
             num_rounds=int(num_rounds),
             players=players,
             couple_rounds=couple_rounds,
-            game_mode=st.session_state.get("game_mode", "mixed"),    # ← use session state
+            game_mode=st.session_state.get("game_mode", "mixed"),
+            court_overrides=st.session_state.get("court_overrides", {}),    # ← add
         )
 
         errors = validate_config(config)
@@ -287,6 +316,8 @@ with tab1:
 
         round_nums = [f"Game {r.round_num}" for r in rounds]
         view_all   = st.checkbox("Show all games", value=True)
+        for court in r.courts:
+                mode = config.get_court_mode(r.round_num, court.court_num) if 'config' in dir() else "mixed"
 
         if view_all:
             selected_rounds = rounds
@@ -429,7 +460,8 @@ with tab1:
                 pdf.set_fill_color(220, 220, 220)
                 pdf.set_text_color(30, 30, 30)
                 for court in r.courts:
-                    pdf.cell(col_width, row_height, f"Court {court.court_num}",
+                    mode_icon = {"mixed": "", "womens": " (W)", "mens": " (M)"}.get(court.mode, "")
+                    pdf.cell(col_width, row_height, f"Court {court.court_num}{mode_icon}",
                             border=1, align="C", fill=True)
                 pdf.ln()
 
@@ -487,9 +519,11 @@ with tab1:
         for r in selected_rounds:
             sit_names = [p.name for p in r.sit_outs]
 
+
             # Build court cells HTML
             cells_html = ""
             for court in r.courts:
+                mode_icon = {"mixed": "⚧", "womens": "👩", "mens": "👨"}.get(court.mode, "⚧")   # ← here, inside the loop
                 t1 = court.team1
                 t2 = court.team2
                 t1_str  = " & ".join(p.name for p in t1.players)
@@ -499,7 +533,7 @@ with tab1:
                 
                 cells_html += f"""
                 <div class="court-cell">
-                    <div class="court-title">Court {court.court_num}</div>
+                    <div class="court-title">{mode_icon} Court {court.court_num}</div>
                     <div class="team-name">{t1_str}{warn_t1}</div>
                     <div class="vs-label">vs</div>
                     <div class="team-name">{t2_str}{warn_t2}</div>

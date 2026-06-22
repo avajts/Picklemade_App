@@ -63,18 +63,14 @@ class ConstraintTracker:
         score = 0
         t1, t2 = court.team1, court.team2
  
-        # ── Priority 1: Gender ────────────────
-        if self.config.game_mode == "mixed":
+        # ── Priority 1: Gender (mixed teams preferred when both genders present) ──
+        genders_present = {p.gender for p in t1.players + t2.players}
+        if len(genders_present) == 2:   # both M and F are in this candidate
             if not t1.is_mixed:
                 score += WEIGHT_GENDER_VIOLATION
             if not t2.is_mixed:
                 score += WEIGHT_GENDER_VIOLATION
-        elif self.config.game_mode == "womens":
-            if any(p.gender == "M" for p in t1.players + t2.players):
-                score += WEIGHT_GENDER_VIOLATION
-        elif self.config.game_mode == "mens":
-            if any(p.gender == "F" for p in t1.players + t2.players):
-                score += WEIGHT_GENDER_VIOLATION
+        # if only one gender is present (single-gender court), no penalty applies
  
         # ── Priority 2: Partner freshness ─────
         score += self._partner_score(t1)

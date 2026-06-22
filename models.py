@@ -76,6 +76,7 @@ class CourtAssignment:
     court_num: int
     team1: Team
     team2: Team
+    mode: str = "mixed" 
 
     @property
     def all_players(self) -> list[Player]:
@@ -120,6 +121,7 @@ class ScheduleConfig:
     couple_rounds: dict[tuple[str, str], int] = field(default_factory=dict)
     # ^ key: (player_name_A, player_name_B), value: how many rounds they play together
     game_mode: str = "mixed"
+    court_overrides: dict[tuple[int, int], str] = field(default_factory=dict)
 
     @property
     def players_per_round(self) -> int:

@@ -322,6 +322,16 @@ def validate_config(config: ScheduleConfig) -> list[str]:
                     f"must be between 0.0 and 7.0."
                 )
 
+    # ── Court override validation ─────────────
+    valid_modes = {"mixed", "womens", "mens"}
+    for (r_num, c_num), mode in config.court_overrides.items():
+        if r_num < 1 or r_num > config.num_rounds:
+            errors.append(f"Court override error: round {r_num} doesn't exist (1-{config.num_rounds}).")
+        if c_num < 1 or c_num > config.num_courts:
+            errors.append(f"Court override error: court {c_num} doesn't exist (1-{config.num_courts}).")
+        if mode not in valid_modes:
+            errors.append(f"Court override error: '{mode}' is not a valid mode (mixed/womens/mens).")
+
     return errors
 
 
