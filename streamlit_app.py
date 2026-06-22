@@ -158,6 +158,8 @@ with st.sidebar:
     if "persisted_gender" not in st.session_state:
         st.session_state.persisted_gender = "F"
 
+    existing_names = [p["name"] for p in st.session_state.players]
+
     # ── Preferred partners builder (outside form — needs dynamic rows) ──
     if "pending_partners" not in st.session_state:
         st.session_state.pending_partners = []   # list of (name, rounds) for the NEXT player being added
