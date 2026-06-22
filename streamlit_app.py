@@ -159,6 +159,16 @@ with st.sidebar:
     if "pending_partners" not in st.session_state:
         st.session_state.pending_partners = []
 
+    if "pending_partners" not in st.session_state:
+        st.session_state.pending_partners = []
+
+    # Handle field clearing from the previous run, BEFORE widgets are created
+    if st.session_state.get("clear_player_fields", False):
+        st.session_state.new_player_name   = ""
+        st.session_state.pp_rounds_input    = 1
+        st.session_state.new_player_rating  = 0.0
+        st.session_state.clear_player_fields = False
+
     existing_names = [p["name"] for p in st.session_state.players]
 
     # Name + Gender
@@ -248,11 +258,7 @@ with st.sidebar:
 
             st.session_state.persisted_gender = form_gender
             st.session_state.pending_partners = []
-
-            # Manually clear the input fields since we're not using a form anymore
-            st.session_state.new_player_name = ""
-            st.session_state.pp_rounds_input = 1
-            st.session_state.new_player_rating = 0.0
+            st.session_state.clear_player_fields = True   # ← flag instead of direct assignment
 
             st.success(f"Added {name}!")
             st.rerun()
