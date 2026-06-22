@@ -231,11 +231,11 @@ with st.sidebar:
         key="new_player_avoid",
     )
 
-    # Duper Rating
+    # DUPR Rating
     form_rating = st.number_input(
-        "Duper rating (optional)",
+        "DUPR rating (optional)",
         min_value=0.0, max_value=7.0, value=0.0, step=0.01, format="%.2f",
-        help="Skill rating from 0.0 to 7.0. Leave at 0.0 if unknown.",
+        help="DUPR skill rating from 0.0 to 7.0. Leave at 0.0 if unknown.",
         key="new_player_rating",
     )
 
