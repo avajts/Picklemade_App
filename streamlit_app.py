@@ -172,7 +172,7 @@ with st.sidebar:
     if st.session_state.get("clear_player_fields", False):
         st.session_state.new_player_name   = ""
         st.session_state.pp_rounds_input    = 1
-        st.session_state.new_player_rating  = 0.0
+        st.session_state.new_player_rating  = ""
         st.session_state.new_player_avoid   = "None"
         st.session_state.pp_name_select     = "None"
         st.session_state.clear_player_fields = False
@@ -232,12 +232,24 @@ with st.sidebar:
     )
 
     # DUPR Rating
-    form_rating = st.number_input(
+    form_rating_raw = st.text_input(
         "DUPR rating (optional)",
-        min_value=0.0, max_value=7.0, value=0.0, step=0.01, format="%.2f",
-        help="DUPR skill rating from 0.0 to 7.0. Leave at 0.0 if unknown.",
+        placeholder="e.g. 4.25",
+        help="DUPR skill rating from 0.0 to 7.0. Leave blank if unknown.",
         key="new_player_rating",
     )
+
+    # Parse and validate the typed value
+    form_rating = None
+    if form_rating_raw.strip():
+        try:
+            parsed = float(form_rating_raw.strip())
+            if 0.0 <= parsed <= 7.0:
+                form_rating = parsed
+            else:
+                st.warning("DUPR rating must be between 0.0 and 7.0 — it won't be saved.")
+        except ValueError:
+            st.warning("DUPR rating must be a number (e.g. 4.25) — it won't be saved.")
 
     # Submit button
     add_clicked = st.button("➕ Add Player", type="primary", use_container_width=True)
@@ -256,7 +268,7 @@ with st.sidebar:
                 "gender":             form_gender,
                 "preferred_partners": partners_list,
                 "avoid_partner":      form_avoid if form_avoid != "None" else None,
-                "duper_rating":       form_rating if form_rating > 0.0 else None,
+                "duper_rating":       form_rating,
             })
 
             for partner_name, rounds in partners_list:
