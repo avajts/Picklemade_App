@@ -319,7 +319,33 @@ def validate_config(config: ScheduleConfig) -> list[str]:
 
     return errors
 
+def validate_score(team1_score: int, team2_score: int, scoring_config: "ScoringConfig") -> str | None:
+    """
+    Validates a final score against the scoring rules.
+    Returns an error message string if invalid, or None if valid.
+    """
+    if team1_score < 0 or team2_score < 0:
+        return "Scores cannot be negative."
 
+    if team1_score == team2_score:
+        return "Scores can't be tied — there must be a winner."
+
+    winner = max(team1_score, team2_score)
+    margin = abs(team1_score - team2_score)
+
+    if scoring_config.game_to == "timed":
+        return None  # any non-tied score is valid for timed games
+
+    game_to = int(scoring_config.game_to)
+    win_by  = scoring_config.win_by
+
+    if winner < game_to:
+        return f"Winning score must be at least {game_to}."
+
+    if margin < win_by:
+        return f"Win must be by at least {win_by} point(s). Current margin is {margin}."
+
+    return None
  
 
 

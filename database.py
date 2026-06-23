@@ -60,12 +60,17 @@ def serialize_schedule(rounds: list) -> list[dict]:
 
 
 def serialize_config(config) -> dict:
-    """Converts ScheduleConfig + player roster into a plain JSON-safe dict."""
     return {
         "num_courts": config.num_courts,
         "num_rounds": config.num_rounds,
         "game_mode": config.game_mode,
         "court_overrides": {f"{r}_{c}": m for (r, c), m in config.court_overrides.items()},
+        "scoring_config": {
+            "game_to": config.scoring_config.game_to,
+            "win_by": config.scoring_config.win_by,
+            "scoring_type": config.scoring_config.scoring_type,
+            "time_limit_minutes": config.scoring_config.time_limit_minutes,
+        },
         "players": [
             {
                 "name": p.name,

@@ -223,6 +223,16 @@ with st.sidebar:
     num_rounds = col_r.number_input("Rounds", min_value=1, max_value=50, value=8)
     st.divider()
 
+    with st.expander("🏆 Scoring Settings"):
+        game_to_choice = st.selectbox("Game format", ["11", "15", "21", "timed"], index=0)
+        win_by_choice  = st.selectbox("Win by", [1, 2], index=1)
+        scoring_type_choice = st.selectbox("Scoring type", ["sideout", "rally"], index=0)
+        time_limit = None
+        if game_to_choice == "timed":
+            time_limit = st.number_input("Time limit (minutes)", min_value=1, max_value=60, value=12)
+
+    st.divider()
+
     # ── Per-round court gender overrides ──────
     with st.expander("🎛️ Advanced: Per-Round Court Overrides"):
         st.caption(
@@ -416,12 +426,22 @@ with st.sidebar:
     if st.button("🎲 Generate Schedule", type="primary", use_container_width=True):
         players = session_players()
 
+        from models import ScoringConfig
+        sc_data = config_data.get("scoring_config", {})
+        scoring_config = ScoringConfig(
+            game_to=sc_data.get("game_to", 11),
+            win_by=sc_data.get("win_by", 2),
+            scoring_type=sc_data.get("scoring_type", "sideout"),
+            time_limit_minutes=sc_data.get("time_limit_minutes"),
+        )
+
         config = ScheduleConfig(
-            num_courts=int(num_courts),
-            num_rounds=int(num_rounds),
+            num_courts=config_data["num_courts"],
+            num_rounds=config_data["num_rounds"],
             players=players,
-            game_mode=st.session_state.get("game_mode", "mixed"),
-            court_overrides=st.session_state.get("court_overrides", {}),
+            game_mode=config_data["game_mode"],
+            court_overrides=court_overrides,
+            scoring_config=scoring_config,
         )
         st.session_state.last_config = config
 
@@ -544,6 +564,8 @@ tab1, tab2, tab3, tab4 = st.tabs(["📅 Schedule", "🏆 Stats", "📊 Pair Matr
 #  Tab 1 — Schedule
 # ═══════════════════════════════════════════
 with tab1:
+    config = st.session_state.get("last_config")
+    
     if st.session_state.schedule is None:
         st.info("Generate a schedule first.")
     else:
@@ -794,6 +816,40 @@ with tab1:
                 {sitout_html}
             </div>
             """, unsafe_allow_html=True)
+
+            # ── Score entry for this round ────────
+            if st.session_state.get("session_code"):
+                with st.expander(f"📝 Enter scores for Game {r.round_num}"):
+                    existing_scores = load_scores(st.session_state.session_code)
+                    for court in r.courts:
+                        t1_name = " & ".join(p.name for p in court.team1.players)
+                        t2_name = " & ".join(p.name for p in court.team2.players)
+                        existing = existing_scores.get((r.round_num, court.court_num), {})
+
+                        sc1, sc2, sc3 = st.columns([2, 1, 1])
+                        sc1.markdown(f"**Court {court.court_num}:** {t1_name} vs {t2_name}")
+                        score1 = sc2.number_input(
+                            f"{t1_name} score", min_value=0, max_value=99,
+                            value=existing.get("team1_score", 0),
+                            key=f"score1_{r.round_num}_{court.court_num}",
+                            label_visibility="collapsed",
+                        )
+                        score2 = sc3.number_input(
+                            f"{t2_name} score", min_value=0, max_value=99,
+                            value=existing.get("team2_score", 0),
+                            key=f"score2_{r.round_num}_{court.court_num}",
+                            label_visibility="collapsed",
+                        )
+
+                        if st.button(f"💾 Save", key=f"save_score_{r.round_num}_{court.court_num}"):
+                            from utils import validate_score
+                            error = validate_score(score1, score2, config.scoring_config)
+                            if error:
+                                st.error(error)
+                            else:
+                                save_score(st.session_state.session_code, r.round_num, court.court_num, score1, score2)
+                                st.success("Score saved!")
+                                st.rerun()
 
 # ═══════════════════════════════════════════
 #  Tab 2 — Stats
