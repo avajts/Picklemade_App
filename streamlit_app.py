@@ -13,7 +13,7 @@ import pandas as pd
 from models import Player, ScheduleConfig, Team, Round, CourtAssignment
 from scheduler import build_schedule
 from utils import validate_config
-from database import save_session, load_session, save_score, load_scores, get_supabase_client
+from database import save_session, load_session, save_score, load_scores
 
 try:
     _ = st.secrets["SUPABASE_URL"]
@@ -494,14 +494,6 @@ with st.sidebar:
                     st.warning(f"Schedule generated, but couldn't save to shared storage: {e}")
             else:
                 st.success("Schedule ready!")
-
-    if st.button("🔧 Test Supabase Connection"):
-        try:
-            client = get_supabase_client()
-            result = client.table("sessions").select("*").limit(1).execute()
-            st.success(f"Connected! Found {len(result.data)} existing rows.")
-        except Exception as e:
-            st.error(f"Connection test failed: {e}")
 
     if st.button("🗑️ Reset", type="secondary", use_container_width=True):
         for key in ["players", "schedule", "warnings", "tracker", "sit_summary"]:
@@ -1125,24 +1117,6 @@ with tab5:
             raw_standings = compute_standings(rounds, scores)
             ranked = rank_standings(raw_standings)
 
-            # TEMPORARY DEBUG
-            with st.expander("🔧 DEBUG — raw standings data"):
-                for ps in raw_standings:
-                    if ps.name in ["Ava", "Sam"]:
-                        st.write(f"{ps.name}: wins={ps.wins}, losses={ps.losses}, "
-                                 f"PF={ps.points_for}, PA={ps.points_against}, "
-                                 f"diff={ps.point_differential}, h2h={ps.head_to_head_wins}")
-
-                # Check grouping behavior directly
-                groups_debug = {}
-                for ps in raw_standings:
-                    key = (ps.wins, ps.losses)
-                    groups_debug.setdefault(key, []).append(ps.name)
-
-                st.write("Groups by (wins, losses):")
-                for key, names in groups_debug.items():
-                    st.write(f"  {key} → {names}")
-                    
             st.subheader("🥇 Standings")
             st.caption(f"Based on {len(scores)} completed match(es) out of {sum(len(r.courts) for r in rounds)} total.")
 
