@@ -13,7 +13,7 @@ import pandas as pd
 from models import Player, ScheduleConfig
 from scheduler import build_schedule
 from utils import validate_config
-from database import save_session, load_session, save_score, load_scores
+from database import save_session, load_session, save_score, load_scores, get_supabase_client
 
 try:
     _ = st.secrets["SUPABASE_URL"]
@@ -378,6 +378,14 @@ with st.sidebar:
                     st.warning(f"Schedule generated, but couldn't save to shared storage: {e}")
             else:
                 st.success("Schedule ready!")
+
+    if st.button("🔧 Test Supabase Connection"):
+        try:
+            client = get_supabase_client()
+            result = client.table("sessions").select("*").limit(1).execute()
+            st.success(f"Connected! Found {len(result.data)} existing rows.")
+        except Exception as e:
+            st.error(f"Connection test failed: {e}")
 
     if st.button("🗑️ Reset", type="secondary", use_container_width=True):
         for key in ["players", "schedule", "warnings", "tracker", "sit_summary"]:
