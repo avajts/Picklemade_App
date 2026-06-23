@@ -1,4 +1,4 @@
 streamlit
 pandas
 fpdf2
-supabase
+supabase==2.3.4
