@@ -138,11 +138,21 @@ def deserialize_loaded_session(session_data: dict):
     ]
     player_lookup = {p.name: p for p in players}
 
-    # Rebuild court_overrides (keys were flattened to "round_court" strings for JSON)
+    # Rebuild court_overrides
     court_overrides = {}
     for key_str, mode in config_data.get("court_overrides", {}).items():
         r_str, c_str = key_str.split("_")
         court_overrides[(int(r_str), int(c_str))] = mode
+
+    # Rebuild scoring config
+    from models import ScoringConfig
+    sc_data = config_data.get("scoring_config", {})
+    scoring_config = ScoringConfig(
+        game_to=sc_data.get("game_to", 11),
+        win_by=sc_data.get("win_by", 2),
+        scoring_type=sc_data.get("scoring_type", "sideout"),
+        time_limit_minutes=sc_data.get("time_limit_minutes"),
+    )
 
     config = ScheduleConfig(
         num_courts=config_data["num_courts"],
@@ -150,6 +160,7 @@ def deserialize_loaded_session(session_data: dict):
         players=players,
         game_mode=config_data["game_mode"],
         court_overrides=court_overrides,
+        scoring_config=scoring_config,
     )
 
     # Rebuild rounds
