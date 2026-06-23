@@ -10,7 +10,7 @@ Flow:
 
 import streamlit as st
 import pandas as pd
-from models import Player, ScheduleConfig
+from models import Player, ScheduleConfig, Team, Round, CourtAssignment
 from scheduler import build_schedule
 from utils import validate_config
 from database import save_session, load_session, save_score, load_scores, get_supabase_client
@@ -29,6 +29,10 @@ st.set_page_config(
     page_icon="🏓",
     layout="wide",
 )
+
+# ── Check for a session code in the URL (e.g. ?session=PICKLE-1K97) ──
+query_params = st.query_params
+url_session_code = query_params.get("session", None)
 
 st.markdown("""
 <style>
@@ -113,11 +117,94 @@ def recompute_all_stats(rounds, players, config):
 
     return tracker, sit_summary
 
+def deserialize_loaded_session(session_data: dict):
+    """
+    Converts raw Supabase JSON data back into Player/Round/CourtAssignment objects
+    so the rest of the app can render it normally.
+    """
+    config_data   = session_data["config_data"]
+    schedule_data = session_data["schedule_data"]
+
+    # Rebuild players
+    players = [
+        Player(
+            name=p["name"],
+            gender=p["gender"],
+            preferred_partners=[tuple(pp) for pp in p.get("preferred_partners", [])],
+            avoid_partner=p.get("avoid_partner"),
+            duper_rating=p.get("duper_rating"),
+        )
+        for p in config_data["players"]
+    ]
+    player_lookup = {p.name: p for p in players}
+
+    # Rebuild court_overrides (keys were flattened to "round_court" strings for JSON)
+    court_overrides = {}
+    for key_str, mode in config_data.get("court_overrides", {}).items():
+        r_str, c_str = key_str.split("_")
+        court_overrides[(int(r_str), int(c_str))] = mode
+
+    config = ScheduleConfig(
+        num_courts=config_data["num_courts"],
+        num_rounds=config_data["num_rounds"],
+        players=players,
+        game_mode=config_data["game_mode"],
+        court_overrides=court_overrides,
+    )
+
+    # Rebuild rounds
+    rounds = []
+    for r_data in schedule_data:
+        courts = []
+        for c_data in r_data["courts"]:
+            team1_players = [player_lookup[name] for name in c_data["team1"]]
+            team2_players = [player_lookup[name] for name in c_data["team2"]]
+            courts.append(CourtAssignment(
+                court_num=c_data["court_num"],
+                team1=Team(team1_players),
+                team2=Team(team2_players),
+                mode=c_data.get("mode", "mixed"),
+            ))
+        sit_outs = [player_lookup[name] for name in r_data["sit_outs"] if name in player_lookup]
+        rounds.append(Round(round_num=r_data["round_num"], courts=courts, sit_outs=sit_outs))
+
+    return rounds, config, players
+
 # ─────────────────────────────────────────────
 #  Sidebar — Setup
 # ─────────────────────────────────────────────
 with st.sidebar:
+    st.header("🔗 Join a Schedule")
+    join_code_input = st.text_input(
+        "Enter share code",
+        value=url_session_code if url_session_code else "",
+        placeholder="e.g. PICKLE-1K97",
+    )
+    if st.button("📥 Load Schedule", use_container_width=True):
+        if join_code_input.strip():
+            with st.spinner("Loading schedule..."):
+                session_data = load_session(join_code_input.strip())
+            if session_data is None:
+                st.error(f"No schedule found for code '{join_code_input.strip().upper()}'. Check the code and try again.")
+            else:
+                st.session_state.loaded_session_code = join_code_input.strip().upper()
+                st.session_state.loaded_session_data  = session_data
+                st.success("Schedule loaded!")
+                st.rerun()
+        else:
+            st.warning("Please enter a code.")
+
+    st.divider()
     st.header("⚙️ Setup")
+
+    # Auto-load if a session code was passed via URL and not already loaded
+    if url_session_code and "loaded_session_data" not in st.session_state:
+        with st.spinner("Loading shared schedule..."):
+            auto_session_data = load_session(url_session_code)
+        if auto_session_data:
+            st.session_state.loaded_session_code = url_session_code.upper()
+            st.session_state.loaded_session_data  = auto_session_data
+            st.rerun()
     
     st.subheader("🎮 Game Mode")
     game_mode = st.radio(
@@ -402,6 +489,17 @@ with st.sidebar:
         st.text_input("Shareable link", value=share_url, label_visibility="collapsed")
         st.caption("Anyone with this code or link can view the schedule and enter scores.")
 
+# ── If a session was loaded via code/link, populate the normal display state ──
+if st.session_state.get("loaded_session_data") and not st.session_state.get("schedule"):
+    rounds, config, players = deserialize_loaded_session(st.session_state.loaded_session_data)
+    tracker, sit_summary = recompute_all_stats(rounds, players, config)
+
+    st.session_state.schedule     = rounds
+    st.session_state.last_config  = config
+    st.session_state.tracker      = tracker
+    st.session_state.sit_summary  = sit_summary
+    st.session_state.warnings     = []
+    st.session_state.session_code = st.session_state.loaded_session_code
 
 # ─────────────────────────────────────────────
 #  Main area
