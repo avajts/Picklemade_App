@@ -841,6 +841,8 @@ with tab1:
                         existing_t1 = str(existing["team1_score"]) if "team1_score" in existing else ""
                         existing_t2 = str(existing["team2_score"]) if "team2_score" in existing else ""
 
+                        save_key = f"save_score_{r.round_num}_{court.court_num}"
+
                         # Clear "saved" banner if the user starts editing again
                         current_t1_val = st.session_state.get(f"score1_{r.round_num}_{court.court_num}", existing_t1)
                         current_t2_val = st.session_state.get(f"score2_{r.round_num}_{court.court_num}", existing_t2)
@@ -860,7 +862,6 @@ with tab1:
                             label_visibility="collapsed",
                         )
 
-                        save_key = f"save_score_{r.round_num}_{court.court_num}"
                         if st.button(f"💾 Save", key=save_key):
                             if not score1_raw.strip() or not score2_raw.strip():
                                 st.error("Please enter both scores.")
