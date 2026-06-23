@@ -135,15 +135,19 @@ def rank_standings(standings: list[PlayerStanding]) -> list[dict]:
                 continue
             # else fall through to point differential below
 
-        # Use point differential / PF / PA to sort (and to detect a genuine full tie)
+        # Use point differential / PF / PA to sort, then detect sub-ties
+        # (a subset of the group might be tied with each other even if the
+        # full group isn't uniformly tied)
         sorted_group = sorted(group, key=lambda ps: (-ps.point_differential, -ps.points_for, ps.points_against))
 
-        all_still_tied = all(
-            stat_signature(ps) == stat_signature(sorted_group[0]) for ps in sorted_group
-        )
-
-        for ps in sorted_group:
-            final_order.append((ps, all_still_tied))
+        # Walk through sorted_group and mark sub-ties: consecutive players
+        # with IDENTICAL stat signatures are tied with each other
+        for i, ps in enumerate(sorted_group):
+            sig = stat_signature(ps)
+            tied_with_prev = i > 0 and stat_signature(sorted_group[i - 1]) == sig
+            tied_with_next = i < len(sorted_group) - 1 and stat_signature(sorted_group[i + 1]) == sig
+            is_tied = tied_with_prev or tied_with_next
+            final_order.append((ps, is_tied))
 
     result = []
     current_rank = 1
