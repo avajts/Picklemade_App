@@ -89,7 +89,8 @@ def rank_standings(standings: list[PlayerStanding]) -> list[dict]:
     """
     Sorts standings using the full tiebreaker chain:
         1. Wins (desc)
-        2. Head-to-head (only if exactly 2 players tied on everything above)
+        2. Head-to-head (only if exactly 2 players tied, AND their aggregate stats
+           below this level are not also fully identical)
         3. Point differential (desc)
         4. Total points scored (desc)
         5. Fewest points allowed (asc)
@@ -97,16 +98,14 @@ def rank_standings(standings: list[PlayerStanding]) -> list[dict]:
 
     Returns a list of dicts ready for display, each with a "rank" and "tied" flag.
     """
-    # Group players by identical (wins, losses) first — this is our primary tie group
     groups: dict[tuple, list[PlayerStanding]] = {}
     for ps in standings:
         key = (ps.wins, ps.losses)
         groups.setdefault(key, []).append(ps)
 
-    # Sort groups by wins descending
     sorted_group_keys = sorted(groups.keys(), key=lambda k: -k[0])
 
-    final_order: list[tuple[PlayerStanding, bool]] = []   # (player, is_tied)
+    final_order: list[tuple[PlayerStanding, bool]] = []
 
     for group_key in sorted_group_keys:
         group = groups[group_key]
@@ -115,41 +114,40 @@ def rank_standings(standings: list[PlayerStanding]) -> list[dict]:
             final_order.append((group[0], False))
             continue
 
-        if len(group) == 2:
-            # Try head-to-head first
+        # Check if the group is ALSO fully tied on point differential, PF, and PA
+        # before even considering head-to-head — identical aggregate stats should
+        # never be broken by a single head-to-head result.
+        stat_signature = lambda ps: (ps.point_differential, ps.points_for, ps.points_against)
+        all_stats_identical = all(
+            stat_signature(ps) == stat_signature(group[0]) for ps in group
+        )
+
+        if len(group) == 2 and not all_stats_identical:
+            # Only use head-to-head when aggregate stats actually differ
             a, b = group
             a_beat_b = a.head_to_head_wins.get(b.name, 0)
             b_beat_a = b.head_to_head_wins.get(a.name, 0)
 
             if a_beat_b != b_beat_a:
-                # Clear head-to-head winner
                 winner, loser = (a, b) if a_beat_b > b_beat_a else (b, a)
                 final_order.append((winner, False))
                 final_order.append((loser, False))
                 continue
             # else fall through to point differential below
 
-        # 3+ tied, or 2-way tie unresolved by head-to-head — use point differential
-        sorted_group = sorted(
-            group,
-            key=lambda ps: (-ps.point_differential, -ps.points_for, ps.points_against)
-        )
+        # Use point differential / PF / PA to sort (and to detect a genuine full tie)
+        sorted_group = sorted(group, key=lambda ps: (-ps.point_differential, -ps.points_for, ps.points_against))
 
-        # Check if point differential/points_for/points_against ALSO tie completely
-        # (meaning we genuinely can't resolve it)
         all_still_tied = all(
-            (ps.point_differential, ps.points_for, ps.points_against) ==
-            (sorted_group[0].point_differential, sorted_group[0].points_for, sorted_group[0].points_against)
-            for ps in sorted_group
+            stat_signature(ps) == stat_signature(sorted_group[0]) for ps in sorted_group
         )
 
         for ps in sorted_group:
             final_order.append((ps, all_still_tied))
 
-    # Build final ranked output with rank numbers
     result = []
     current_rank = 1
-    for i, (ps, is_tied) in enumerate(final_order):
+    for ps, is_tied in final_order:
         result.append({
             "rank": current_rank,
             "name": ps.name,
