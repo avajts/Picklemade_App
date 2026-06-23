@@ -837,28 +837,51 @@ with tab1:
 
                         sc1, sc2, sc3 = st.columns([2, 1, 1])
                         sc1.markdown(f"**Court {court.court_num}:** {t1_name} vs {t2_name}")
-                        score1 = sc2.number_input(
-                            f"{t1_name} score", min_value=0, max_value=99,
-                            value=existing.get("team1_score", 0),
+
+                        existing_t1 = str(existing["team1_score"]) if "team1_score" in existing else ""
+                        existing_t2 = str(existing["team2_score"]) if "team2_score" in existing else ""
+
+                        # Clear "saved" banner if the user starts editing again
+                        current_t1_val = st.session_state.get(f"score1_{r.round_num}_{court.court_num}", existing_t1)
+                        current_t2_val = st.session_state.get(f"score2_{r.round_num}_{court.court_num}", existing_t2)
+                        if current_t1_val != existing_t1 or current_t2_val != existing_t2:
+                            st.session_state[f"score_saved_{save_key}"] = False
+
+                        score1_raw = sc2.text_input(
+                            f"{t1_name} score", placeholder="0",
+                            value=existing_t1,
                             key=f"score1_{r.round_num}_{court.court_num}",
                             label_visibility="collapsed",
                         )
-                        score2 = sc3.number_input(
-                            f"{t2_name} score", min_value=0, max_value=99,
-                            value=existing.get("team2_score", 0),
+                        score2_raw = sc3.text_input(
+                            f"{t2_name} score", placeholder="0",
+                            value=existing_t2,
                             key=f"score2_{r.round_num}_{court.court_num}",
                             label_visibility="collapsed",
                         )
 
-                        if st.button(f"💾 Save", key=f"save_score_{r.round_num}_{court.court_num}"):
-                            from utils import validate_score
-                            error = validate_score(score1, score2, config.scoring_config)
-                            if error:
-                                st.error(error)
+                        save_key = f"save_score_{r.round_num}_{court.court_num}"
+                        if st.button(f"💾 Save", key=save_key):
+                            if not score1_raw.strip() or not score2_raw.strip():
+                                st.error("Please enter both scores.")
                             else:
-                                save_score(st.session_state.session_code, r.round_num, court.court_num, score1, score2)
-                                st.success("Score saved!")
-                                st.rerun()
+                                try:
+                                    score1 = int(score1_raw.strip())
+                                    score2 = int(score2_raw.strip())
+                                except ValueError:
+                                    st.error("Scores must be whole numbers.")
+                                else:
+                                    from utils import validate_score
+                                    error = validate_score(score1, score2, config.scoring_config)
+                                    if error:
+                                        st.error(error)
+                                    else:
+                                        save_score(st.session_state.session_code, r.round_num, court.court_num, score1, score2)
+                                        st.session_state[f"score_saved_{save_key}"] = True
+                                        st.rerun()
+
+                        if st.session_state.get(f"score_saved_{save_key}"):
+                            st.success("✅ Score saved!")
 
 # ═══════════════════════════════════════════
 #  Tab 2 — Stats
