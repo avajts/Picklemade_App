@@ -567,7 +567,7 @@ if st.session_state.warnings:
             st.warning(w)
 
 # ── Tabs ─────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs(["📅 Schedule", "🏆 Stats", "📊 Pair Matrix", "✏️ Edit Schedule"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📅 Schedule", "🏆 Stats", "📊 Pair Matrix", "✏️ Edit Schedule", "🥇 Standings"])
 
 # ═══════════════════════════════════════════
 #  Tab 1 — Schedule
@@ -1104,6 +1104,53 @@ with tab4:
                     st.session_state.sit_summary = sit_summary
                     st.success(f"Round {edit_round_num} updated!")
                     st.rerun()
+
+# ═══════════════════════════════════════════
+#  Tab 5 — Standings
+# ═══════════════════════════════════════════
+with tab5:
+    if st.session_state.schedule is None:
+        st.info("Generate a schedule first.")
+    elif not st.session_state.get("session_code"):
+        st.info("Standings require a shared session. Generate a schedule to get a share code first.")
+    else:
+        from standings import compute_standings, rank_standings
+
+        rounds = st.session_state.schedule
+        scores = load_scores(st.session_state.session_code)
+
+        if not scores:
+            st.info("No scores entered yet. Enter scores in the Schedule tab to see standings here.")
+        else:
+            raw_standings = compute_standings(rounds, scores)
+            ranked = rank_standings(raw_standings)
+
+            st.subheader("🥇 Standings")
+            st.caption(f"Based on {len(scores)} completed match(es) out of {sum(len(r.courts) for r in rounds)} total.")
+
+            for row in ranked:
+                tie_tag = " 🔸 *(tied)*" if row["tied"] else ""
+                cols = st.columns([1, 3, 2, 2, 2, 2])
+                cols[0].markdown(f"**#{row['rank']}**{tie_tag}")
+                cols[1].markdown(f"**{row['name']}**")
+                cols[2].markdown(f"{row['wins']}-{row['losses']}")
+                cols[3].markdown(f"PF: {row['points_for']}")
+                cols[4].markdown(f"PA: {row['points_against']}")
+                diff = row['point_differential']
+                diff_str = f"+{diff}" if diff > 0 else str(diff)
+                cols[5].markdown(f"Diff: {diff_str}")
+
+            st.divider()
+
+            # Full table view as an alternative display
+            import pandas as pd
+            df = pd.DataFrame(ranked)
+            df = df.rename(columns={
+                "rank": "Rank", "name": "Player", "wins": "W", "losses": "L",
+                "games_played": "GP", "points_for": "PF", "points_against": "PA",
+                "point_differential": "Diff", "tied": "Tied"
+            })
+            st.dataframe(df, use_container_width=True, hide_index=True)
 
 # ─────────────────────────────────────────────
 #  Footer
