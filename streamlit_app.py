@@ -1125,6 +1125,14 @@ with tab5:
             raw_standings = compute_standings(rounds, scores)
             ranked = rank_standings(raw_standings)
 
+            # TEMPORARY DEBUG
+            with st.expander("🔧 DEBUG — raw standings data"):
+                for ps in raw_standings:
+                    if ps.name in ["Ava", "Sam"]:
+                        st.write(f"{ps.name}: wins={ps.wins}, losses={ps.losses}, "
+                                 f"PF={ps.points_for}, PA={ps.points_against}, "
+                                 f"diff={ps.point_differential}, h2h={ps.head_to_head_wins}")
+
             st.subheader("🥇 Standings")
             st.caption(f"Based on {len(scores)} completed match(es) out of {sum(len(r.courts) for r in rounds)} total.")
 
