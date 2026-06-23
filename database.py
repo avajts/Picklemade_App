@@ -18,10 +18,12 @@ import streamlit as st
 #  Client setup
 # ─────────────────────────────────────────────
 
+import os
+
 @st.cache_resource
 def get_supabase_client() -> Client:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    url = os.environ.get("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY") or st.secrets.get("SUPABASE_KEY")
     return create_client(url, key)
 
 
