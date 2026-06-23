@@ -13,6 +13,13 @@ import pandas as pd
 from models import Player, ScheduleConfig
 from scheduler import build_schedule
 from utils import validate_config
+from database import save_session, load_session, save_score, load_scores
+
+try:
+    _ = st.secrets["SUPABASE_URL"]
+    SUPABASE_CONFIGURED = True
+except Exception:
+    SUPABASE_CONFIGURED = False
 
 # ─────────────────────────────────────────────
 #  Page config
@@ -361,13 +368,31 @@ with st.sidebar:
                 st.session_state.warnings    = warnings
                 st.session_state.tracker     = tracker
                 st.session_state.sit_summary = sit_summary
-            st.success("Schedule ready!")
+
+            if SUPABASE_CONFIGURED:
+                try:
+                    session_code = save_session(rounds, config)
+                    st.session_state.session_code = session_code
+                    st.success(f"Schedule ready! Share code: **{session_code}**")
+                except Exception as e:
+                    st.warning(f"Schedule generated, but couldn't save to shared storage: {e}")
+            else:
+                st.success("Schedule ready!")
 
     if st.button("🗑️ Reset", type="secondary", use_container_width=True):
         for key in ["players", "schedule", "warnings", "tracker", "sit_summary"]:
             if key in st.session_state:
                 del st.session_state[key]
         st.rerun()
+
+    if st.session_state.get("session_code"):
+        st.divider()
+        st.markdown("### 🔗 Share This Schedule")
+        code = st.session_state.session_code
+        st.code(code, language=None)
+        share_url = f"https://picklemadeapp.streamlit.app/?session={code}"
+        st.text_input("Shareable link", value=share_url, label_visibility="collapsed")
+        st.caption("Anyone with this code or link can view the schedule and enter scores.")
 
 
 # ─────────────────────────────────────────────
