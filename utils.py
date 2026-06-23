@@ -290,12 +290,12 @@ def validate_config(config: ScheduleConfig) -> list[str]:
                 errors.append(
                     f"Avoid error: '{p.name}' cannot avoid themselves."
                 )
-            # Check they're not also listed as a couple
-            for (na, nb) in config.couple_rounds.keys():
+            # Check they're not also listed as a preferred partner
+            for (na, nb) in config.get_all_preferred_pairs().keys():
                 if set([p.name, p.avoid_partner]) == set([na, nb]):
                     errors.append(
                         f"Conflict: '{p.name}' and '{p.avoid_partner}' "
-                        f"are listed as both a couple and an avoid pair."
+                        f"are listed as both a preferred partner and an avoid pair."
                     )
 
     # ── Duper rating validation ───────────────
