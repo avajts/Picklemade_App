@@ -1,4 +1,5 @@
 streamlit
 pandas
 fpdf2
-supabase==2.3.4
+supabase==2.9.1
+httpx==0.27.2
