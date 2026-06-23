@@ -1138,8 +1138,11 @@ with tab5:
                 for ps in raw_standings:
                     key = (ps.wins, ps.losses)
                     groups_debug.setdefault(key, []).append(ps.name)
-                st.write("Groups by (wins, losses):", groups_debug)
 
+                st.write("Groups by (wins, losses):")
+                for key, names in groups_debug.items():
+                    st.write(f"  {key} → {names}")
+                    
             st.subheader("🥇 Standings")
             st.caption(f"Based on {len(scores)} completed match(es) out of {sum(len(r.courts) for r in rounds)} total.")
 
