@@ -15,6 +15,13 @@ ScheduleConfig -> everything the user inputs, in one clean object
 
 from dataclasses import dataclass, field
 
+@dataclass
+class ScoringConfig:
+    game_to: int | str = 11          # 11, 15, 21, or "timed"
+    win_by: int = 2                  # 1 or 2
+    scoring_type: str = "sideout"    # "sideout" or "rally"
+    time_limit_minutes: int | None = None   # only used if game_to == "timed"
+
 # Player 
 
 @dataclass
@@ -161,10 +168,3 @@ class ScheduleConfig:
             f"{len(self.players)} players "
             f"[{self.num_males}M / {self.num_females}F])"
         )
-
-@dataclass
-class ScoringConfig:
-    game_to: int | str = 11          # 11, 15, 21, or "timed"
-    win_by: int = 2                  # 1 or 2
-    scoring_type: str = "sideout"    # "sideout" or "rally"
-    time_limit_minutes: int | None = None   # only used if game_to == "timed"
