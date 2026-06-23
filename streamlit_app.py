@@ -1133,6 +1133,13 @@ with tab5:
                                  f"PF={ps.points_for}, PA={ps.points_against}, "
                                  f"diff={ps.point_differential}, h2h={ps.head_to_head_wins}")
 
+                # Check grouping behavior directly
+                groups_debug = {}
+                for ps in raw_standings:
+                    key = (ps.wins, ps.losses)
+                    groups_debug.setdefault(key, []).append(ps.name)
+                st.write("Groups by (wins, losses):", groups_debug)
+
             st.subheader("🥇 Standings")
             st.caption(f"Based on {len(scores)} completed match(es) out of {sum(len(r.courts) for r in rounds)} total.")
 
