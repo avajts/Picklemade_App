@@ -438,24 +438,22 @@ with st.sidebar:
         players = session_players()
 
         from models import ScoringConfig
-        sc_data = config_data.get("scoring_config", {})
         scoring_config = ScoringConfig(
-            game_to=sc_data.get("game_to", 11),
-            win_by=sc_data.get("win_by", 2),
-            scoring_type=sc_data.get("scoring_type", "sideout"),
-            time_limit_minutes=sc_data.get("time_limit_minutes"),
+            game_to=game_to_choice if game_to_choice == "timed" else int(game_to_choice),
+            win_by=win_by_choice,
+            scoring_type=scoring_type_choice,
+            time_limit_minutes=time_limit,
         )
 
         config = ScheduleConfig(
-            num_courts=config_data["num_courts"],
-            num_rounds=config_data["num_rounds"],
+            num_courts=int(num_courts),
+            num_rounds=int(num_rounds),
             players=players,
-            game_mode=config_data["game_mode"],
-            court_overrides=court_overrides,
+            game_mode=st.session_state.get("game_mode", "mixed"),
+            court_overrides=st.session_state.get("court_overrides", {}),
             scoring_config=scoring_config,
         )
         st.session_state.last_config = config
-
         errors = validate_config(config)
         if errors:
             for e in errors:
