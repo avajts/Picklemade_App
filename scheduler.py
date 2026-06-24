@@ -420,24 +420,26 @@ def _best_effort_fill(
     courts    = []
 
     for court_num in range(1, config.num_courts + 1):
-        if len(remaining) < 4:
-            break
-        group    = remaining[:4]
-        remaining = remaining[4:]
+            if len(remaining) < 4:
+                break
+            group    = remaining[:4]
+            remaining = remaining[4:]
 
-        # Pick the best gender split among the 3 possible splits
-        best = max(
-            _split_four(group),
-            key=lambda split: (
-                Team(list(split[0])).is_mixed + Team(list(split[1])).is_mixed
+            court_mode = config.get_court_mode(round_num, court_num)   # ← define it here
+
+            # Pick the best gender split among the 3 possible splits
+            best = max(
+                _split_four(group),
+                key=lambda split: (
+                    Team(list(split[0])).is_mixed + Team(list(split[1])).is_mixed
+                )
             )
-        )
-        courts.append(CourtAssignment(
-            court_num=court_num,
-            team1=Team(list(best[0])),
-            team2=Team(list(best[1])),
-            mode=court_mode, 
-        ))
+            courts.append(CourtAssignment(
+                court_num=court_num,
+                team1=Team(list(best[0])),
+                team2=Team(list(best[1])),
+                mode=court_mode,
+            ))
 
     return courts
 
