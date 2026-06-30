@@ -13,12 +13,13 @@ from utils import CoupleScheduler
 #  Scoring weights  
  
 WEIGHT_GENDER_VIOLATION  = -1000   # per non-mixed team
-WEIGHT_PARTNER_REPEAT    =   -10   # per prior round as partners
+WEIGHT_PARTNER_REPEAT    =   -50   # per prior round as partners
 WEIGHT_OPPONENT_REPEAT   =    -5   # per prior round as opponents
 WEIGHT_COUPLE_BONUS      =   500   # per couple correctly paired on their assigned round
 WEIGHT_AVOID_VIOLATION = -2000 
 WEIGHT_CONSECUTIVE_COURT = -500   # same 4 players on same court in back-to-back rounds
 WEIGHT_CONSECUTIVE_PAIR_COURT = -300   # same 2 players on same court 3+ rounds in a row 
+WEIGHT_CONSECUTIVE_PARTNER = -400  # same two players as partners in back-to-back rounds
 
 #  ConstraintTracker
  
@@ -92,6 +93,9 @@ class ConstraintTracker:
 
         # ── Consecutive pair court penalty ────
         score += self._consecutive_pair_court_score(court, round_num)
+
+        # ── Consecutive partner penalty ───────
+        score += self._consecutive_partner_score(court, round_num)
 
         return score
  
@@ -246,6 +250,22 @@ class ConstraintTracker:
                 # If they were together last round AND streak is already 2+, penalize
                 if last == round_num - 1 and streak >= 2:
                     score += WEIGHT_CONSECUTIVE_PAIR_COURT
+        return score
+    
+    def _consecutive_partner_score(self, court: CourtAssignment, round_num: int) -> int:
+        """
+        Penalize if either team's partner pair was also partners in the immediately
+        preceding round — targets back-to-back partner repeats specifically.
+        """
+        score = 0
+        for team in [court.team1, court.team2]:
+            p1, p2 = team.players
+            key = frozenset({p1.name, p2.name})
+            last = self.last_pair_court_round.get(key, -99)
+            if last == round_num - 1:
+                # Check if they were partners (not just on the same court) last round
+                if self.partner_count[p1.name][p2.name] > 0:
+                    score += WEIGHT_CONSECUTIVE_PARTNER
         return score
  
 if __name__ == "__main__":

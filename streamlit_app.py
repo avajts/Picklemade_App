@@ -416,11 +416,14 @@ with st.sidebar:
             c1.markdown(f"{gender_icon} **{p['name']}**{couple_tag}{avoid_tag}{rating_tag}")
             if c2.button("❌", key=f"del_{i}"):
                 removed = st.session_state.players.pop(i)
-                if removed["couple_partner"]:
-                    for q in st.session_state.players:
-                        if q["name"] == removed["couple_partner"]:
-                            q["couple_partner"] = None
-                            q["couple_rounds"]  = 0
+                # Clean up any preferred_partners references to the removed player
+                for q in st.session_state.players:
+                    q["preferred_partners"] = [
+                        (name, rounds) for name, rounds in q.get("preferred_partners", [])
+                        if name != removed["name"]
+                    ]
+                    if q.get("avoid_partner") == removed["name"]:
+                        q["avoid_partner"] = None
                 st.rerun()
 
         male_count   = sum(1 for p in st.session_state.players if p["gender"] == "M")
@@ -435,6 +438,15 @@ with st.sidebar:
 
     # ── Generate + Reset buttons ─────────────
     if st.button("🎲 Generate Schedule", type="primary", use_container_width=True):
+        # Clear any previously generated or loaded schedule first
+        st.session_state.schedule     = None
+        st.session_state.tracker      = None
+        st.session_state.sit_summary  = {}
+        st.session_state.warnings     = []
+        st.session_state.session_code = None
+        if "loaded_session_data" in st.session_state:
+            del st.session_state["loaded_session_data"]
+        
         players = session_players()
 
         from models import ScoringConfig
@@ -450,7 +462,7 @@ with st.sidebar:
             num_rounds=int(num_rounds),
             players=players,
             game_mode=st.session_state.get("game_mode", "mixed"),
-            court_overrides=st.session_state.get("court_overrides", {}),
+            court_overrides=st.session_state.get("court_overrides", {}),,
             scoring_config=scoring_config,
         )
         st.session_state.last_config = config
@@ -793,8 +805,8 @@ with tab1:
                 t2 = court.team2
                 t1_str  = " & ".join(p.name for p in t1.players)
                 t2_str  = " & ".join(p.name for p in t2.players)
-                warn_t1 = " ⚠️ same gender" if (not t1.is_mixed and st.session_state.get("game_mode", "mixed") == "mixed") else ""
-                warn_t2 = " ⚠️ same gender" if (not t2.is_mixed and st.session_state.get("game_mode", "mixed") == "mixed") else ""
+                warn_t1 = ""
+                warn_t2 = ""
                 
                 is_leftover = (court.court_num == leftover_for_this_round and mode_icon == "⚧")
                 skill_tag   = " 🎯" if is_leftover else ""
