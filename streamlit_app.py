@@ -462,7 +462,7 @@ with st.sidebar:
             num_rounds=int(num_rounds),
             players=players,
             game_mode=st.session_state.get("game_mode", "mixed"),
-            court_overrides=st.session_state.get("court_overrides", {}),,
+            court_overrides=st.session_state.get("court_overrides", {}),
             scoring_config=scoring_config,
         )
         st.session_state.last_config = config
